@@ -1,4 +1,4 @@
-from app.db.session import Base
-from app.models.user import User
+from sqlalchemy.orm import DeclarativeBase
 
-#ensures models are registered
+class Base(DeclarativeBase):
+    pass
