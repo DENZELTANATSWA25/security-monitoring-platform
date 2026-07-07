@@ -1,7 +1,11 @@
 from fastapi import FastAPI
+from app.core.config import settings
 
-app = FastAPI(title="Security Monitoring Platform")
+app = FastAPI(title=settings.APP_NAME)
 
 @app.get("/")
 def health_check():
-    return {"status": "ok", "mesage": "Backend is running"}
+    return {
+        "status": "ok",
+        "environment": settings.APP_ENV,
+        "mesage": "Backend is running"}
