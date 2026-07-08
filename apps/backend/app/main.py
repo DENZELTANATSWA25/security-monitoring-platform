@@ -1,6 +1,6 @@
 from fastapi import FastAPI
 
-from app.api.v1.endpoints import auth
+from app.api.v1.endpoints import auth, users
 
 from app.core.config import settings
 from app.db.init_db import init_database
@@ -13,6 +13,10 @@ app = FastAPI(
 
 app.include_router(
     auth.router,
+    prefix="/api/v1"
+)
+app.include_router(
+    users.router,
     prefix="/api/v1"
 )
 
