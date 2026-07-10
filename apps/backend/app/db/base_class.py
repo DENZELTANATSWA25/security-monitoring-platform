@@ -2,7 +2,7 @@ import uuid
 
 from sqlalchemy import DateTime
 from sqlalchemy.dialects.postgresql import UUID
-from sqlalchemy.orm import DeclarativeBase, MApped, mapped_column
+from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column
 from sqlalchemy.sql import func
 
 class Base(DeclarativeBase):
@@ -20,12 +20,12 @@ class BaseEntity(Base):
     created_at: Mapped = mapped_column(
         DateTime(timezone=True),
         server_default=func.now(),
-        nullalbe=False
+        nullable=False
     )
 
     updated_at: Mapped = mapped_column(
         DateTime(timezone=True),
         server_default=func.now(),
         onupdate=func.now(),
-        nullalbe=False
+        nullable=False
     )
