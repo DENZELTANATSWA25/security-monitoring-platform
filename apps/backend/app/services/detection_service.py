@@ -1,69 +1,28 @@
-from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select
-
-from app.models.alert import Alert
-from app.models.security_event import SecurityEvent
-
-from app.services.alert_service import create_alert
-from app.services.security_detection_service import count_failed_attempts
+from datetime import datetime, timedelta
 
 
-async def detect_bruteforce(
-        db: AsyncSession,
-        email: str
-):
-
-    failed_count = await count_failed_attempts(
-        db,
-        email
-    )
-
-    if failed_count >= 5:
-
-        message = (
-            f"Brute force attack detected on {email}"
-        )
-
-        # Check existing unresolved alert
-        result = await db.execute(
-            select(Alert)
-            .where(
-                Alert.alert_type == "BRUTE_FORCE_ATTACK",
-                Alert.message == message,
-                Alert.resolved == False
-            )
-        )
-
-        existing_alert = result.scalar_one_or_none()
+FAILED_LOGIN_THRESHOLD = 5
+TIME_WINDOW_MINUTES = 10
 
 
-        # Do not create duplicate alerts
-        if existing_alert:
-            return False
+def detect_bruteforce(events):
+    """
+    Detect possible brute force login attempts.
 
+    Returns True if suspicious activity is detected.
+    """
 
-        # Create security event
-        event = SecurityEvent(
-            event_type="BRUTE_FORCE_ATTACK",
-            severity="CRITICAL",
-            source="auth-service",
-            message=message,
-        )
+    if not events:
+        return False
 
-        db.add(event)
+    now = datetime.utcnow()
 
-        await db.commit()
+    recent_failures = [
+        event
+        for event in events
+        if event.get("status") == "failed"
+        and now - event.get("timestamp", now)
+        <= timedelta(minutes=TIME_WINDOW_MINUTES)
+    ]
 
-
-        # Create alert
-        await create_alert(
-            db,
-            alert_type="BRUTE_FORCE_ATTACK",
-            severity="CRITICAL",
-            message=message
-        )
-
-        return True
-
-
-    return False
+    return len(recent_failures) >= FAILED_LOGIN_THRESHOLD

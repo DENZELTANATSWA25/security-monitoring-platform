@@ -31,11 +31,8 @@ router = APIRouter(
 )
 async def create_security_event(
     event: SecurityEventCreate,
-    db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(get_current_user)
+    db: AsyncSession = Depends(get_db)
 ):
-
-    event.user_id = current_user.id
 
     return await create_event(
         db,

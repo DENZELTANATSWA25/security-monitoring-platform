@@ -6,7 +6,8 @@ from sqlalchemy import (
     String,
     Text,
     DateTime,
-    Enum
+    Enum,
+    JSON
 )
 
 from app.db.base import Base
@@ -33,7 +34,6 @@ class SecurityEvent(Base):
         primary_key=True,
         index=True
     )
-
 
     event_type = Column(
         String(100),
@@ -64,10 +64,14 @@ class SecurityEvent(Base):
         Integer,
         nullable=True
     )
+    
+    event_metadata = Column(
+        JSON,
+        nullable=True
+    )
 
 
-    timestamp = Column(
+    created_at = Column(
         DateTime,
-        default=datetime.utcnow,
-        nullable=False
+        default=datetime.utcnow
     )

@@ -19,7 +19,7 @@ async def create_event(
         select(SecurityEvent)
         .where(
             SecurityEvent.event_type == event_data.event_type,
-            SecurityEvent.message == event_data.message
+            SecurityEvent.message == event_data.description
         )
     )
 
@@ -35,8 +35,9 @@ async def create_event(
         event_type=event_data.event_type,
         severity=event_data.severity,
         source=event_data.source,
-        message=event_data.message,
-        user_id=event_data.user_id
+        message=event_data.description,
+        user_id=event_data.user_id,
+        event_metadata=event_data.event_metadata
     )
 
 
@@ -44,8 +45,8 @@ async def create_event(
 
     await db.commit()
 
-    await db.refresh(event)
-
-    await detect_bruteforce(db)
+    await db.refresh(
+        event
+    )
 
     return event

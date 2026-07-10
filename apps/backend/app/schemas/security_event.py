@@ -14,27 +14,18 @@ class SecurityEventCreate(BaseModel):
 
     source: str
 
-    message: str
+    description: str
 
     user_id: int | None = None
 
+    event_metadata: dict | None = None
 
 
 class SecurityEventResponse(BaseModel):
 
     id: int
 
-    event_type: str
-
-    severity: EventSeverity
-
-    source: str
-
-    message: str
-
-    user_id: int | None
-
-    timestamp: datetime
+    created_at: datetime
 
 
     class Config:

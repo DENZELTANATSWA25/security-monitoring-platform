@@ -4,7 +4,6 @@ from datetime import datetime, timedelta
 from sqlalchemy import select, func
 
 from app.models.login_attempt import LoginAttempt
-from app.services.detection_service import detect_bruteforce
 
 async def record_login_attempt (
         db:AsyncSession,
@@ -24,11 +23,23 @@ async def record_login_attempt (
     await db.commit()
 
     if not successful:
-        from app.services.detection_service import detect_bruteforce
-        await detect_bruteforce(
+        from app.services.detection.engine import run_detection
+        from app.services.alert_service import create_alert
+        
+        detections = await run_detection(
             db,
-            email
+            {
+                "email": email
+            }
         )
+        
+        for detection in detections:
+            await create_alert(
+                db,
+                detection["alert_type"],
+                detection["severity"],
+                detection["message"]
+            )
 
 async def count_failed_attempts(
         db: AsyncSession,

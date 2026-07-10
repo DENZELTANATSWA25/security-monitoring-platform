@@ -12,8 +12,6 @@ from app.services.login_attempt_service import (
     record_login_attempt
 )
 
-from app.services.detection_service import detect_bruteforce
-
 
 async def authenticate_user(
     db: AsyncSession,
@@ -57,11 +55,6 @@ async def login_user(
             db=db,
             email=email,
             successful=False
-        )
-
-        await detect_bruteforce(
-            db=db,
-            email=email
         )
 
         raise ValueError(
