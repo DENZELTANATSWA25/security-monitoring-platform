@@ -4,7 +4,8 @@ from sqlalchemy import select
 
 from app.models.security_event import SecurityEvent
 from app.schemas.security_event import SecurityEventCreate
-from app.services.detection_service import detect_bruteforce
+from app.services.alert_service import create_alert
+from app.services.detection.engine import run_detection
 
 
 
@@ -29,8 +30,8 @@ async def create_event(
     if duplicate:
         return duplicate
 
-
-
+   
+    #Create the event
     event = SecurityEvent(
         event_type=event_data.event_type,
         severity=event_data.severity,
@@ -40,13 +41,30 @@ async def create_event(
         event_metadata=event_data.event_metadata
     )
 
-
     db.add(event)
-
     await db.commit()
+    await db.refresh(event)
 
-    await db.refresh(
-        event
+    #run the detection engine
+    context = {
+         "email": event_data.event_metadata.get("email"),
+         "ip": event_data.event_metadata.get("ip"),
+        "event": event
+        }
+
+    results = await run_detection(
+         db,
+        context
     )
 
+    for result in results:
+        await create_alert(
+            db=db,
+            alert_type=result["alert_type"],
+            severity=result["severity"],
+            message=result["message"]
+        )
+
     return event
+        
+        

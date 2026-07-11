@@ -6,8 +6,6 @@ from app.services.detection.brute_force_rule import (
 
 rules = [
     BruteForceRule(),
-    SuspiciousLoginRule(),
-    MalwareRule(),
 ]
 
 async def run_detection(

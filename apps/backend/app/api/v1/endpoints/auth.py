@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Request
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -63,14 +63,18 @@ async def register_user(
     response_model=Token,
 )
 async def login(
+    request: Request,
     user: UserLogin,
     db: AsyncSession = Depends(get_db),
 ):
     try:
+        client_ip = request.client.host
+
         return await login_user(
             db=db,
             email=user.email,
             password=user.password,
+            ip_address=client_ip
         )
 
     except ValueError as e:

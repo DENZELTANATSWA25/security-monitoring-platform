@@ -1,28 +1,35 @@
 from datetime import datetime, timedelta
-
+from sqlalchemy import select, func
+from sqlalchemy.ext.asyncio import AsyncSession
+from app.models.login_attempt import LoginAttempt
 
 FAILED_LOGIN_THRESHOLD = 5
-TIME_WINDOW_MINUTES = 10
+TIME_WINDOW = datetime.utcnow() - timedelta(minutes=5)
 
+async def detect_bruteforce(
+    db: AsyncSession,
+    user_id: int | None,
+    ip: str
+):
+    
+    result = await db.execute(
+        select(func.count(LoginAttempt.id))
+        .where(
+            LoginAttempt.ip_address == ip,
+            LoginAttempt.created_at > TIME_WINDOW,
+            LoginAttempt.successful == False
+        )
+    )
 
-def detect_bruteforce(events):
-    """
-    Detect possible brute force login attempts.
+    attempts = result.scalar()
 
-    Returns True if suspicious activity is detected.
-    """
+    if attempts >= 5:
+        return {
+            "detected": True,
+            "rule": "BRUTE_FORCE_LOGIN",
+            "severity": "HIGH",
+        }
 
-    if not events:
-        return False
-
-    now = datetime.utcnow()
-
-    recent_failures = [
-        event
-        for event in events
-        if event.get("status") == "failed"
-        and now - event.get("timestamp", now)
-        <= timedelta(minutes=TIME_WINDOW_MINUTES)
-    ]
-
-    return len(recent_failures) >= FAILED_LOGIN_THRESHOLD
+    return {
+        "detected": False
+    }
