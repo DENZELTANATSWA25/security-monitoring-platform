@@ -4,8 +4,8 @@
 import {useDashboard} from "@/hooks/use-dashboard";
 import EventsTable from "@/components/dashboard/event-table";
 import AlertsPanel from "@/components/dashboard/alerts-panel";
-import StatCard from "@/components/dashboard/stat-card";
 import DashboardGrid from "@/components/dashboard/dashboard-grid";
+import EventChart from "@/components/dashboard/event-chart";
 
 
 export default function Home(){
@@ -50,6 +50,8 @@ Security Dashboard
 <DashboardGrid
 data={data}
 />
+
+<EventChart/>
 
 <EventsTable/>
 

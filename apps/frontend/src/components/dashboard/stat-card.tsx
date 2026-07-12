@@ -6,6 +6,7 @@ interface StatCardProps {
     value: number | string;
     subtitle?: string;
     icon?: ReactNode;
+    description?: string;
 }
 
 export default function StatCard({

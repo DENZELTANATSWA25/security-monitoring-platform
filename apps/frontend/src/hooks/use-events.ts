@@ -5,6 +5,7 @@ export function useEvents() {
     return useQuery({
         queryKey: ["security-events"],
         queryFn: getEvents,
-        refetchInterval: 5000
+        refetchInterval: 5000,
+        refetchOnWindowFocus: true,
     });
 }

@@ -14,6 +14,10 @@ import {Badge} from "@/components/ui/badge";
 
 
 import {useEvents} from "@/hooks/use-events";
+import { useState } from "react";
+import { Input } from "@/components/ui/input";
+import EventDetails from "./event-details";
+import { SecurityEvent } from "@/types/event";
 
 
 export default function EventsTable(){
@@ -24,11 +28,28 @@ data,
 isLoading
 }=useEvents();
 
+const [search, setSearch] = useState("");
+const [selectedEvent, setSelectedEvent] = useState<SecurityEvent | null>(null);
+const [dialogOpen, setDialogOpen] = useState(false);
+
 
 
 if(isLoading)
 return <div>Loading events...</div>
 
+
+const filteredEvents =
+    data?.filter((event) => {
+
+        const query = search.toLowerCase();
+
+        return (
+            event.event_type.toLowerCase().includes(query) ||
+            event.source.toLowerCase().includes(query) ||
+            event.message.toLowerCase().includes(query)
+        );
+
+    }) ?? [];
 
 
 return (
@@ -40,6 +61,12 @@ return (
 Recent Security Events
 </h2>
 
+<Input
+placeholder="Search events..."
+value={search}
+onChange={(e) => setSearch(e.target.value)}
+className="mb-4"
+/>
 
 <Table>
 
@@ -80,9 +107,23 @@ Message
 
 
 {
-data?.map((event)=>(
+filteredEvents.map((event)=>(
 
-<TableRow key={event.id}>
+<TableRow
+
+    key={event.id}
+
+    className="cursor-pointer hover:bg-slate-100"
+
+    onClick={() => {
+
+        setSelectedEvent(event);
+
+        setDialogOpen(true);
+
+    }}
+
+>
 
 <TableCell>
 {event.id}
@@ -99,9 +140,7 @@ data?.map((event)=>(
 variant={
     event.severity === "CRITICAL"
     ? "destructive"
-    : event.severity === "WARNING"
-    ? "secondary"
-    : "default"
+    : "outline"
 }
 >
 {event.severity}
@@ -132,6 +171,11 @@ variant={
 
 </Table>
 
+<EventDetails
+event={selectedEvent}
+open={dialogOpen}
+onOpenChange={setDialogOpen}
+/>
 
 </div>
 

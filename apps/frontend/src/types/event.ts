@@ -8,5 +8,6 @@ export interface SecurityEvent {
         | "CRITICAL";
     source: string;
     message: string;
-    created_at: string
+    created_at: string;
+    event_metadata?: Record<string, unknown>;
 }

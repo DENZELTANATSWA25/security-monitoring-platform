@@ -58,6 +58,10 @@ class SecurityEventListResponse(BaseModel):
 
     message: str
 
+    user_id: int | None
+
+    event_metadata: dict[str, Any] | None
+
     created_at: datetime
 
 

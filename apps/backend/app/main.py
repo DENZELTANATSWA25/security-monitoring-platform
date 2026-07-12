@@ -6,7 +6,8 @@ from app.api.v1.endpoints import (
     audit,
     events,
     alerts,
-    dashboard
+    dashboard,
+    analytics
 )
 
 from fastapi.middleware.cors import CORSMiddleware
@@ -59,6 +60,10 @@ app.include_router(
 )
 app.include_router(
     dashboard.router,
+    prefix="/api/v1"
+)
+app.include_router(
+    analytics.router,
     prefix="/api/v1"
 )
 

@@ -13,7 +13,8 @@ export function useAlerts() {
     return useQuery({
         queryKey: ["alerts"],
         queryFn: getAlerts,
-        refetchInterval: 5000
+        refetchInterval: 5000,
+        refetchOnWindowFocus: true
     });
 }
 
