@@ -1,5 +1,9 @@
 "use client";
 
+import {Button} from "@/components/ui/button";
+import {useMutation, useQueryClient} from "@tanstack/react-query";
+import {resolveAlert} from "@/services/alerts.service"; 
+
 
 import {useAlerts} from "@/hooks/use-alerts";
 
@@ -16,6 +20,16 @@ const {
 data,
 isLoading
 }=useAlerts();
+
+const queryClient = useQueryClient();
+const mutation = useMutation({
+    mutationFn: resolveAlert,
+    onSuccess: () => {
+        queryClient.invalidateQueries({
+            queryKey: ["alerts"]
+        });
+    },
+});
 
 
 
@@ -72,8 +86,16 @@ font-bold
 </h3>
 
 
-<Badge>
+<Badge
+variant={
+    alert.severity==="CRITICAL"
+    ?"destructive"
+    :"secondary"
+}
+>
+
 {alert.severity}
+
 </Badge>
 
 
@@ -86,6 +108,12 @@ font-bold
 {alert.message}
 
 </p>
+<Button
+className="mt-4"
+onClick={() => mutation.mutate(alert.id)}
+>
+    Resolve
+</Button>
 
 
 <p className="

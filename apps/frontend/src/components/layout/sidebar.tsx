@@ -1,134 +1,65 @@
 "use client";
 
+import { usePathname } from "next/navigation";
+
 import Link from "next/link";
-import {
-    LayoutDashboard,
-    ShieldAlert,
-    Search,
-    Users,
-    Settings,
-    FileText,
-    ScrollText
-} from "lucide-react";
 
+export default function Sidebar() {
+    const pathname = usePathname();
+    return (
+        <aside className="w-64 min-h-screen border-r bg-slate-950 text-white">
 
-const navigation = [
+            <div className="p-6 text-xl font-bold">
+                Security SOC
+            </div>
 
-    {
-        name:"Dashboard",
-        href:"/",
-        icon:LayoutDashboard,
-    },
+            <nav className="space-y-2 p-4">
 
-    {
-        name:"Alerts",
-        href:"/alerts",
-        icon:ShieldAlert,
-    },
+                <Link
+                href="/"
+                className={`block rounded p-3 hover:bg-slate-800 ${
+                pathname === "/"
+                ? "bg-slate-800"
+                : ""
+                }`}
+                 >
+                    Dashboard
+                </Link>
 
-    {
-        name:"Investigations",
-        href:"/investigations",
-        icon:Search,
-    },
+                <Link
+                    href="/alerts"
+                    className={`block rounded p-3 hover:bg-slate-800 ${
+                    pathname === "/alerts"
+                    ? "bg-slate-800"
+                    : ""
+                    }`}
+                >
+                    Alerts
+                </Link>
 
-    {
-        name:"Users",
-        href:"/users",
-        icon:Users,
-    },
+                <Link
+                    href="/events"
+                    className={'block rounded p-3 hover:bg-slate-800 ${pathname === "/events" ? "bg-slate-800" : ""}'}
+                >
+                    Events
+                </Link>
 
-    {
-        name:"Rules",
-        href:"/rules",
-        icon:ScrollText,
-    },
+                <Link
+                    href="/users"
+                    className={'block rounded p-3 hover:bg-slate-800 ${pathname === "/users" ? "bg-slate-800" : ""}'}
+                >
+                    Users
+                </Link>
 
-    {
-        name:"Reports",
-        href:"/reports",
-        icon:FileText,
-    },
+                <Link
+                    href="/reports"
+                    className={'block rounded p-3 hover:bg-slate-800 ${pathname === "/reports" ? "bg-slate-800" : ""}'}
+                >
+                    Reports
+                </Link>
 
-    {
-        name:"Settings",
-        href:"/settings",
-        icon:Settings,
-    }
+            </nav>
 
-];
-
-
-export default function Sidebar(){
-
-return (
-
-<aside className="
-w-64
-min-h-screen
-border-r
-bg-slate-950
-text-white
-p-5
-">
-
-
-<h1 className="
-text-xl
-font-bold
-mb-8
-">
-Security Monitor
-</h1>
-
-
-<nav className="space-y-2">
-
-
-{
-navigation.map((item)=>{
-
-const Icon=item.icon;
-
-
-return (
-
-<Link
-key={item.name}
-href={item.href}
-className="
-flex
-items-center
-gap-3
-rounded-lg
-px-3
-py-2
-hover:bg-slate-800
-transition
-"
->
-
-
-<Icon size={18}/>
-
-<span>
-{item.name}
-</span>
-
-
-</Link>
-
-)
-
-})
-}
-
-
-</nav>
-
-
-</aside>
-
-)
-
+        </aside>
+    );
 }

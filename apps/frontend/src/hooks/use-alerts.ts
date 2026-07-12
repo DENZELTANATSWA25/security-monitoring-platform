@@ -12,7 +12,8 @@ import {
 export function useAlerts() {
     return useQuery({
         queryKey: ["alerts"],
-        queryFn: getAlerts
+        queryFn: getAlerts,
+        refetchInterval: 5000
     });
 }
 

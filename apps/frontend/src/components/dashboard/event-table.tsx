@@ -88,14 +88,24 @@ data?.map((event)=>(
 {event.id}
 </TableCell>
 
-
 <TableCell>
 {event.event_type}
 </TableCell>
 
-
 <TableCell>
+
+
+<Badge
+variant={
+    event.severity === "CRITICAL"
+    ? "destructive"
+    : event.severity === "WARNING"
+    ? "secondary"
+    : "default"
+}
+>
 {event.severity}
+</Badge>
 </TableCell>
 
 
