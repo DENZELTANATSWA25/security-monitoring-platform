@@ -6,6 +6,7 @@ import EventsTable from "@/components/dashboard/event-table";
 import AlertsPanel from "@/components/dashboard/alerts-panel";
 import DashboardGrid from "@/components/dashboard/dashboard-grid";
 import EventChart from "@/components/dashboard/event-chart";
+import { useLiveEvents } from "@/hooks/use-live-events";
 
 
 export default function Home(){
@@ -16,6 +17,8 @@ data,
 isLoading,
 error
 }=useDashboard();
+
+useLiveEvents();
 
 
 

@@ -9,5 +9,5 @@ export interface SecurityEvent {
     source: string;
     message: string;
     created_at: string;
-    event_metadata?: Record<string, unknown>;
+    event_metadata?: Record<string, string | number | boolean>;
 }

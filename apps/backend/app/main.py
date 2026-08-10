@@ -7,7 +7,9 @@ from app.api.v1.endpoints import (
     events,
     alerts,
     dashboard,
-    analytics
+    analytics,
+    websocket,
+    incidents
 )
 
 from fastapi.middleware.cors import CORSMiddleware
@@ -18,7 +20,10 @@ from app.db import base
 from app.models import (
     user,
     audit_log,
-    security_event
+    security_event,
+    login_attempt,
+    alert,
+    incident,
 )
 
 
@@ -64,6 +69,13 @@ app.include_router(
 )
 app.include_router(
     analytics.router,
+    prefix="/api/v1"
+)
+app.include_router(
+    websocket.router
+)
+app.include_router(
+    incidents.router,
     prefix="/api/v1"
 )
 

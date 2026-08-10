@@ -7,6 +7,8 @@ from app.schemas.security_event import SecurityEventCreate
 from app.services.alert_service import create_alert
 from app.services.detection.engine import run_detection
 
+from app.core.websocket_manager import manager
+
 
 
 async def create_event(
@@ -46,6 +48,8 @@ async def create_event(
     await db.refresh(event)
 
     #run the detection engine
+    metadata = event_data.event_metadata or {}
+    
     context = {
          "email": event_data.event_metadata.get("email"),
          "ip": event_data.event_metadata.get("ip"),
@@ -64,6 +68,20 @@ async def create_event(
             severity=result["severity"],
             message=result["message"]
         )
+
+    await manager.broadcast(
+        {
+            "type": "security_event",
+            "event": {
+                "id": event.id,
+                "event_type": event.event_type,
+                "severity": event.severity.value,
+                "source": event.source,
+                "message": event.message,
+                "created_at": event.created_at.isoformat(),
+            }
+        }
+    )
 
     return event
         
