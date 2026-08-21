@@ -7,40 +7,72 @@ export function useLiveEvents() {
     const queryClient = useQueryClient();
 
     useEffect(() => {
-        const socket = new WebSocket("ws://localhost:8000/ws/events")
+        let socket: WebSocket | null = null;
+        let reconnectTimer: ReturnType<typeof setTimeout> | null = null;
+        let manuallyClosed = false;
 
-        socket.onopen = () => {
-            console.log("Connected to WebSocket server");
+        function connect() {
+            socket = new WebSocket(
+                "ws://localhost:8000/ws/events"
+            );
 
-            socket.send("connected");
-        };
+            socket.onopen = () => {
+                console.log(
+                    "Connected to WebSocket server"
+                );
 
-        socket.onmessage = (event) => {
-            const data = JSON.parse(event.data);
+                socket?.send("connected");
+            };
 
-            if (data.type === "security_event") {
-                console.log("New Event:", data);
+            socket.onmessage = (event) => {
+                try {
+                    const data = JSON.parse(event.data);
 
-                queryClient.invalidateQueries({
-                    queryKey: ["events"],
-            });
+                    if (data.type === "security_event") {
+                        queryClient.invalidateQueries({
+                            queryKey: ["events"],
+                        });
 
-            queryClient.invalidateQueries({
-                queryKey: ["dashboard-summary"],
-            });
-            }
-        };
+                        queryClient.invalidateQueries({
+                            queryKey: ["dashboard-summary"],
+                        });
 
-        socket.onclose = () => {
-            console.log("WebSocket disconnected");
-        };
+                        queryClient.invalidateQueries({
+                            queryKey: ["event-trend"],
+                        });
+                    }
+                } catch {
+                    console.warn(
+                        "Received invalid WebSocket message"
+                    );
+                }
+            };
 
-        socket.onerror = (error) => {
-            console.error(error);
-        };
+            socket.onclose = () => {
+                if (manuallyClosed) {
+                    return;
+                }
+
+                reconnectTimer = setTimeout(() => {
+                    connect();
+                }, 3000);
+            };
+
+            socket.onerror = () => {
+                socket?.close();
+            };
+        }
+
+        connect();
 
         return () => {
-            socket.close();
+            manuallyClosed = true;
+
+            if (reconnectTimer) {
+                clearTimeout(reconnectTimer);
+            }
+
+            socket?.close();
         };
     }, [queryClient]);
 }

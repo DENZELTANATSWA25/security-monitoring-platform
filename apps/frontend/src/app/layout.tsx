@@ -1,28 +1,19 @@
 import "./globals.css";
 
-import AppLayout from "@/components/layout/app-layout";
 import QueryProvider from "@/providers/query-provider";
 
 export default function RootLayout({
-  children,
+    children,
 }: {
-  children: React.ReactNode;
+    children: React.ReactNode;
 }) {
-  return (
-    <html lang="en">
-      <body>
-
-        <QueryProvider>
-
-          <AppLayout>
-
-            {children}
-
-          </AppLayout>
-
-        </QueryProvider>
-
-      </body>
-    </html>
-  );
+    return (
+        <html lang="en">
+            <body>
+                <QueryProvider>
+                    {children}
+                </QueryProvider>
+            </body>
+        </html>
+    );
 }

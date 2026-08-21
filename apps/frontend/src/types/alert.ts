@@ -1,13 +1,7 @@
 export interface Alert {
-    id:number;
-
+    id: number;
     alert_type: string;
-
-    severity:
-        | "INFO"
-        | "WARNING"
-        | "ERROR"
-        | "CRITICAL";
+    severity: string;
     message: string;
     resolved: boolean;
     created_at: string;

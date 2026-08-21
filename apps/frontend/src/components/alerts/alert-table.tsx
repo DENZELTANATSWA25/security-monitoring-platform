@@ -1,193 +1,226 @@
 "use client";
 
-
 import {
-Table,
-TableBody,
-TableCell,
-TableHead,
-TableHeader,
-TableRow
+    Table,
+    TableBody,
+    TableCell,
+    TableHead,
+    TableHeader,
+    TableRow,
 } from "@/components/ui/table";
 
+import { Button } from "@/components/ui/button";
+
+import SeverityBadge from "./severity-badge";
 
 import {
-Button
-} from "@/components/ui/button";
+    useAlerts,
+    useResolveAlert,
+} from "@/hooks/use-alerts";
 
 
-import SeverityBadge
-from "./severity-badge";
+export default function AlertTable() {
 
+    const {
+        data,
+        isLoading,
+        error,
+    } = useAlerts();
 
-import {
-useAlerts,
-useResolveAlert
-}
-from "@/hooks/use-alerts";
+    const resolve = useResolveAlert();
 
 
+    if (isLoading) {
+        return (
+            <div className="bg-white rounded-xl border p-6">
+                Loading alerts...
+            </div>
+        );
+    }
 
-export default function AlertTable(){
 
+    if (error) {
+        return (
+            <div className="bg-white rounded-xl border p-6">
 
-const {
-data,
-isLoading
-}=useAlerts();
+                <p className="font-semibold text-red-600">
+                    Failed to load alerts.
+                </p>
 
+                <p className="text-sm text-muted-foreground mt-1">
+                    Please check that the backend is running.
+                </p>
 
-const resolve =
-useResolveAlert();
+            </div>
+        );
+    }
 
 
+    if (!data || data.length === 0) {
+        return (
+            <div className="bg-white rounded-xl border p-6">
 
-if(isLoading)
-return <p>Loading alerts...</p>;
+                <p className="font-semibold">
+                    No security alerts
+                </p>
 
+                <p className="text-sm text-muted-foreground mt-1">
+                    There are currently no alerts in the system.
+                </p>
 
+            </div>
+        );
+    }
 
-return (
 
-<div className="
-bg-white
-rounded-xl
-border
-p-5
-">
+    return (
 
+        <div className="bg-white rounded-xl border p-5">
 
-<h2 className="
-text-xl
-font-bold
-mb-5
-">
+            <div className="flex items-center justify-between mb-5">
 
-Security Alerts
+                <div>
 
-</h2>
+                    <h2 className="text-xl font-bold">
+                        Security Alerts
+                    </h2>
 
+                    <p className="text-sm text-muted-foreground mt-1">
+                        {data.length} alert{data.length === 1 ? "" : "s"} total
+                    </p>
 
+                </div>
 
-<Table>
+            </div>
 
 
-<TableHeader>
+            <Table>
 
-<TableRow>
+                <TableHeader>
 
-<TableHead>
-Severity
-</TableHead>
+                    <TableRow>
 
-<TableHead>
-Type
-</TableHead>
+                        <TableHead>
+                            Severity
+                        </TableHead>
 
-<TableHead>
-Message
-</TableHead>
+                        <TableHead>
+                            Type
+                        </TableHead>
 
-<TableHead>
-Status
-</TableHead>
+                        <TableHead>
+                            Message
+                        </TableHead>
 
-<TableHead>
-Action
-</TableHead>
+                        <TableHead>
+                            Status
+                        </TableHead>
 
-</TableRow>
+                        <TableHead>
+                            Created
+                        </TableHead>
 
-</TableHeader>
+                        <TableHead>
+                            Action
+                        </TableHead>
 
+                    </TableRow>
 
+                </TableHeader>
 
-<TableBody>
 
+                <TableBody>
 
-{
-data?.map(alert=>(
+                    {data.map((alert) => (
 
+                        <TableRow key={alert.id}>
 
-<TableRow key={alert.id}>
+                            <TableCell>
 
+                                <SeverityBadge
+                                    severity={alert.severity}
+                                />
 
-<TableCell>
+                            </TableCell>
 
-<SeverityBadge
-severity={alert.severity}
-/>
 
-</TableCell>
+                            <TableCell className="font-medium">
 
+                                {alert.alert_type}
 
+                            </TableCell>
 
-<TableCell>
-{alert.alert_type}
-</TableCell>
 
+                            <TableCell>
 
+                                {alert.message ?? "No message"}
 
-<TableCell>
-{alert.message}
-</TableCell>
+                            </TableCell>
 
 
+                            <TableCell>
 
-<TableCell>
+                                {alert.resolved ? (
+                                    <span className="text-green-600 font-medium">
+                                        Resolved
+                                    </span>
+                                ) : (
+                                    <span className="text-red-600 font-medium">
+                                        Open
+                                    </span>
+                                )}
 
-{
-alert.resolved
-?
-"Resolved"
-:
-"Open"
-}
+                            </TableCell>
 
-</TableCell>
 
+                            <TableCell className="text-sm text-muted-foreground">
 
+                                {new Date(
+                                    alert.created_at
+                                ).toLocaleString()}
 
-<TableCell>
+                            </TableCell>
 
 
-{
-!alert.resolved &&
+                            <TableCell>
 
-<Button
+                                {!alert.resolved && (
 
-onClick={()=>
-resolve.mutate(alert.id)
-}
+                                    <Button
+                                        size="sm"
+                                        onClick={() =>
+                                            resolve.mutate(alert.id)
+                                        }
+                                        disabled={resolve.isPending}
+                                    >
 
->
+                                        {resolve.isPending
+                                            ? "Resolving..."
+                                            : "Resolve"}
 
-Resolve
+                                    </Button>
 
-</Button>
+                                )}
 
-}
+                                {alert.resolved && (
 
+                                    <span className="text-sm text-muted-foreground">
+                                        No action
+                                    </span>
 
-</TableCell>
+                                )}
 
+                            </TableCell>
 
-</TableRow>
+                        </TableRow>
 
+                    ))}
 
-))
+                </TableBody>
 
-}
+            </Table>
 
+        </div>
 
-</TableBody>
-
-
-</Table>
-
-
-</div>
-
-)
-
+    );
 }

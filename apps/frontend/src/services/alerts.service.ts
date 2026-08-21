@@ -1,9 +1,9 @@
-import {api} from "./api";
-import {Alert} from "@/types/alert";
+import { api } from "./api";
+import { Alert } from "@/types/alert";
 
 export async function getAlerts() {
     const response = await api.get<Alert[]>(
-        "/alerts"
+        "/alerts/"
     );
     return response.data;
 }

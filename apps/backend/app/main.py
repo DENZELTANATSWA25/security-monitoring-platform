@@ -9,7 +9,8 @@ from app.api.v1.endpoints import (
     dashboard,
     analytics,
     websocket,
-    incidents
+    incidents,
+    reports
 )
 
 from fastapi.middleware.cors import CORSMiddleware
@@ -78,7 +79,10 @@ app.include_router(
     incidents.router,
     prefix="/api/v1"
 )
-
+app.include_router(
+    reports.router,
+    prefix="/api/v1"
+)
 
 @app.on_event("startup")
 async def on_startup():

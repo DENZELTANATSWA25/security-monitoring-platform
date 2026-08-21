@@ -44,7 +44,7 @@ async def get_dashboard_summary(
     failed_logins = await db.scalar(
         select(func.count(LoginAttempt.id))
         .where(
-            LoginAttempt.successful.is_(True),
+            LoginAttempt.successful.is_(False),
             LoginAttempt.timestamp > last_24_hours
         )
     )
@@ -52,7 +52,7 @@ async def get_dashboard_summary(
     successful_logins = await db.scalar(
         select(func.count(LoginAttempt.id))
         .where(
-            LoginAttempt.successful.is_(False),
+            LoginAttempt.successful.is_(True),
             LoginAttempt.timestamp > last_24_hours
         )
     )

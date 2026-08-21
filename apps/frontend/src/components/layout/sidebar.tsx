@@ -38,10 +38,24 @@ export default function Sidebar() {
                 </Link>
 
                 <Link
+                    href="/incidents"
+                    className="block rounded p-3 hover:bg-slate-800"
+                >                
+                    Incidents
+                </Link>
+
+                <Link
                     href="/events"
                     className={'block rounded p-3 hover:bg-slate-800 ${pathname === "/events" ? "bg-slate-800" : ""}'}
                 >
                     Events
+                </Link>
+
+                <Link
+                    href="/incidents"
+                    className="block rounded p-3 hover:bg-slate-800"
+                >
+                    Incidents
                 </Link>
 
                 <Link

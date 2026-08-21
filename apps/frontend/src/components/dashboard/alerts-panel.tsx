@@ -1,150 +1,155 @@
 "use client";
 
-import {Button} from "@/components/ui/button";
-import {useMutation, useQueryClient} from "@tanstack/react-query";
-import {resolveAlert} from "@/services/alerts.service"; 
+import { useState } from "react";
+import { useQueryClient } from "@tanstack/react-query";
 
+import { useAlerts } from "@/hooks/use-alerts";
+import { resolveAlert } from "@/services/alerts.service";
 
-import {useAlerts} from "@/hooks/use-alerts";
+import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
 
-import {
-Badge
-} from "@/components/ui/badge";
+export default function AlertsPanel() {
+    const {
+        data,
+        isLoading,
+        error,
+    } = useAlerts();
 
+    const queryClient = useQueryClient();
 
+    const [resolvingId, setResolvingId] = useState<number | null>(null);
 
-export default function AlertsPanel(){
+    if (isLoading) {
+        return (
+            <div className="mt-10">
+                <p>Loading alerts...</p>
+            </div>
+        );
+    }
 
+    if (error) {
+        return (
+            <div className="mt-10">
+                <p className="text-red-600">
+                    Failed to load alerts.
+                </p>
+            </div>
+        );
+    }
 
-const {
-data,
-isLoading
-}=useAlerts();
+    const activeAlerts =
+        data?.filter((alert) => !alert.resolved) ?? [];
 
-const queryClient = useQueryClient();
-const mutation = useMutation({
-    mutationFn: resolveAlert,
-    onSuccess: () => {
-        queryClient.invalidateQueries({
-            queryKey: ["alerts"]
-        });
-    },
-});
+    async function handleResolve(id: number) {
+        try {
+            setResolvingId(id);
 
+            await resolveAlert(id);
 
+            await queryClient.invalidateQueries({
+                queryKey: ["alerts"],
+            });
 
-if(isLoading)
-return <p>
-Loading alerts...
-</p>;
+            await queryClient.invalidateQueries({
+                queryKey: ["dashboard-summary"],
+            });
 
+        } finally {
+            setResolvingId(null);
+        }
+    }
 
+    return (
+        <div className="mt-10">
 
-return (
+            <div className="flex items-center justify-between mb-4">
 
-<div className="mt-10">
+                <h2 className="text-xl font-bold">
+                    Active Security Alerts
+                </h2>
 
+                <Badge>
+                    {activeAlerts.length}
+                </Badge>
 
-<h2 className="text-xl font-bold mb-4">
-Active Security Alerts
-</h2>
+            </div>
 
+            {activeAlerts.length === 0 ? (
 
+                <div className="border rounded-xl p-6">
 
-<div className="space-y-4">
+                    <p className="font-semibold">
+                        No active alerts
+                    </p>
 
+                    <p className="text-sm text-muted-foreground mt-1">
+                        There are currently no unresolved security alerts.
+                    </p>
 
-{
-data
-?.filter(alert=>!alert.resolved)
-.map(alert=>(
+                </div>
 
+            ) : (
 
-<div
-key={alert.id}
-className="
-border
-rounded-xl
-p-5
-"
->
+                <div className="space-y-4">
 
+                    {activeAlerts.map((alert) => (
 
-<div className="
-flex
-justify-between
-"
->
+                        <div
+                            key={alert.id}
+                            className="border rounded-xl p-5"
+                        >
 
+                            <div className="flex items-start justify-between gap-4">
 
-<h3 className="
-font-bold
-">
+                                <div>
 
-{alert.alert_type}
+                                    <h3 className="font-bold">
+                                        {alert.alert_type}
+                                    </h3>
 
-</h3>
+                                    <p className="mt-2">
+                                        {alert.message}
+                                    </p>
 
+                                </div>
 
-<Badge
-variant={
-    alert.severity==="CRITICAL"
-    ?"destructive"
-    :"secondary"
-}
->
+                                <Badge>
+                                    {alert.severity}
+                                </Badge>
 
-{alert.severity}
+                            </div>
 
-</Badge>
+                            <div className="flex items-center justify-between mt-4">
 
+                                <p className="text-sm text-muted-foreground">
+                                    {new Date(
+                                        alert.created_at
+                                    ).toLocaleString()}
+                                </p>
 
-</div>
+                                <Button
+                                    variant="outline"
+                                    disabled={resolvingId === alert.id}
+                                    onClick={() =>
+                                        handleResolve(alert.id)
+                                    }
+                                >
+                                    {resolvingId === alert.id
+                                        ? "Resolving..."
+                                        : "Resolve"}
+                                </Button>
 
+                            </div>
 
+                        </div>
 
-<p className="mt-2">
+                    ))}
 
-{alert.message}
+                </div>
 
-</p>
-<Button
-className="mt-4"
-onClick={() => mutation.mutate(alert.id)}
->
-    Resolve
-</Button>
+            )}
 
-
-<p className="
-text-sm
-text-gray-500
-mt-2
-">
-
-{
-new Date(
-alert.created_at
-).toLocaleString()
-}
-
-</p>
-
-
-</div>
-
-
-))
-
-
-}
-
-
-</div>
-
-
-</div>
-
-)
-
+        </div>
+    );
 }
