@@ -4,7 +4,14 @@ import { usePathname } from "next/navigation";
 
 import Link from "next/link";
 
+import { useCurrentUser } from "@/hooks/use-users";
+import { canViewUsers } from "@/lib/permissions";
+
 export default function Sidebar() {
+    const {
+        data: currentUser,
+    } = useCurrentUser();
+
     const pathname = usePathname();
     return (
         <aside className="w-64 min-h-screen border-r bg-slate-950 text-white">
@@ -58,13 +65,15 @@ export default function Sidebar() {
                     Incidents
                 </Link>
 
-                <Link
-                    href="/users"
-                    className={'block rounded p-3 hover:bg-slate-800 ${pathname === "/users" ? "bg-slate-800" : ""}'}
-                >
-                    Users
-                </Link>
-
+                {canViewUsers(currentUser?.role) && (
+                    <Link
+                        href="/users"
+                        className="block rounded p-3 hover:bg-slate-800"
+                    >
+                        Users
+                    </Link>
+                )}
+                
                 <Link
                     href="/reports"
                     className={'block rounded p-3 hover:bg-slate-800 ${pathname === "/reports" ? "bg-slate-800" : ""}'}

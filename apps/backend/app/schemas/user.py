@@ -30,6 +30,15 @@ class UserResponse(BaseModel):
     class Config:
         from_attributes = True
 
+class UserRoleUpdate(BaseModel):
+    role: UserRole
+
+class UserStatusUpdate(BaseModel):
+    is_active: bool
+
+class UserVerificationUpdate(BaseModel):
+    is_verified: bool
+
 class Token(BaseModel):
     access_token: str
     token_type: str

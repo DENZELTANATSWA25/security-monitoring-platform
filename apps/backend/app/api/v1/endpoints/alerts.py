@@ -11,6 +11,9 @@ from app.services.alert_service import (
     resolve_alert
 )
 
+from app.core.permissions import require_role
+from app.models.user import User, UserRole
+
 router = APIRouter(
     prefix="/alerts",
     tags=["Alerts"]
@@ -50,6 +53,12 @@ async def read_alert(
 async def mark_resolved(
     alert_id: int,
     db: AsyncSession = Depends(get_db),
+    _: User = Depends(
+        require_role(
+            UserRole.ADMIN,
+            UserRole.ANALYST
+        )
+    ),
 ):
     alert = await resolve_alert(db, alert_id)
 

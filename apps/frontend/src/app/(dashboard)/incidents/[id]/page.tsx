@@ -23,12 +23,23 @@ import {
 } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 
+import { useCurrentUser } from "@/hooks/use-users";
+import { canManageIncidents } from "@/lib/permissions";
+
 export default function IncidentDetailsPage() {
+
     const params = useParams();
 
     const id = Number(params.id);
 
     const queryClient = useQueryClient();
+
+    const {
+        data: currentUser,
+    } = useCurrentUser();
+
+    const canManage = 
+        canManageIncidents(currentUser?.role);
 
     const {
         data: incident,
@@ -209,7 +220,6 @@ export default function IncidentDetailsPage() {
 
 
                         {/* Assigned Analyst */}
-
                         <div>
                             <p className="text-sm text-muted-foreground">
                                 Assigned Analyst
@@ -249,8 +259,9 @@ export default function IncidentDetailsPage() {
 
 
             {/* Analyst Assignment */}
-
-            <Card>
+        
+            {canManage && (
+                <Card>
                 <CardHeader>
                     <CardTitle>
                         Analyst Assignment
@@ -285,11 +296,12 @@ export default function IncidentDetailsPage() {
 
                 </CardContent>
             </Card>
+            )}
 
 
             {/* Status Management */}
-
-            <Card>
+            {canManage && (
+                <Card>
                 <CardHeader>
                     <CardTitle>
                         Incident Status
@@ -347,6 +359,8 @@ export default function IncidentDetailsPage() {
 
                 </CardContent>
             </Card>
+            )}
+            
 
 
             {/* Incident Timeline */}

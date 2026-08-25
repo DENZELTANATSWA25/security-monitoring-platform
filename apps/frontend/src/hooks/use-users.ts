@@ -4,12 +4,21 @@ import {
     useSyncExternalStore,
 } from "react";
 
-import { useQuery } from "@tanstack/react-query";
+import {
+    useMutation,
+    useQuery,
+    useQueryClient,
+} from "@tanstack/react-query";
 
 import {
     getUsers,
     getCurrentUser,
+    updateUserRole,
+    updateUserStatus,
+    updateUserVerification,
 } from "@/services/users.service";
+
+import { UserRole } from "@/types/user";
 
 import {
     subscribeToAuth,
@@ -36,5 +45,77 @@ export function useCurrentUser() {
         queryFn: getCurrentUser,
         enabled: Boolean(token),
         retry: false,
+    });
+}
+
+export function useUpdateUserRole() {
+    const queryClient = useQueryClient();
+
+    return useMutation({
+        mutationFn: ({
+            userId,
+            role,
+        }: {
+            userId: number;
+            role: UserRole;
+        }) =>
+            updateUserRole(
+                userId,
+                role
+            ),
+
+        onSuccess: async () => {
+            await queryClient.invalidateQueries({
+                queryKey: ["users"]
+            });
+        },
+    });
+}
+
+export function useUpdateUserStatus() {
+    const queryClient = useQueryClient();
+
+    return useMutation({
+        mutationFn: ({
+            userId,
+            isActive,
+        }: {
+            userId: number;
+            isActive: boolean;
+        }) =>
+            updateUserStatus(
+                userId,
+                isActive
+            ),
+
+        onSuccess: async () => {
+            await queryClient.invalidateQueries({
+                queryKey: ["users"]
+            });
+        },
+    });
+}
+
+export function useUpdateUserVerification() {
+    const queryClient = useQueryClient();
+
+    return useMutation({
+        mutationFn: ({
+            userId,
+            isVerified,
+        }: {
+            userId: number;
+            isVerified: boolean;
+        }) =>
+            updateUserVerification(
+                userId,
+                isVerified
+            ),
+
+        onSuccess: async () => {
+            await queryClient.invalidateQueries({
+                queryKey: ["users"]
+            });
+        },
     });
 }

@@ -18,8 +18,15 @@ import {
     useResolveAlert,
 } from "@/hooks/use-alerts";
 
+import { useCurrentUser } from "@/hooks/use-users";
+import { canResolveAlerts } from "@/lib/permissions";
+
 
 export default function AlertTable() {
+
+    const {
+        data: currentUser,
+    } = useCurrentUser();
 
     const {
         data,
@@ -184,7 +191,8 @@ export default function AlertTable() {
 
                             <TableCell>
 
-                                {!alert.resolved && (
+                                {!alert.resolved && 
+                                canResolveAlerts(currentUser?.role) && (
 
                                     <Button
                                         size="sm"

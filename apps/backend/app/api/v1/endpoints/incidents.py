@@ -14,6 +14,7 @@ from app.schemas.incident import (
 )
 
 from app.models.incident import IncidentStatus
+from app.models.user import User, UserRole
 
 from app.services.incident_service import (
     create_incident,
@@ -22,6 +23,8 @@ from app.services.incident_service import (
     assign_incident,
     update_status,
 )
+
+from app.core.permissions import require_role
 
 
 router = APIRouter(
@@ -37,6 +40,12 @@ router = APIRouter(
 async def create(
     incident: IncidentCreate,
     db: AsyncSession = Depends(get_db),
+    _: User = Depends(
+        require_role(
+            UserRole.ADMIN,
+            UserRole.ANALYST,
+        )
+    ),
 ):
     return await create_incident(
         db=db,
@@ -87,6 +96,12 @@ async def assign(
     incident_id: int,
     analyst: str,
     db: AsyncSession = Depends(get_db),
+    _: User = Depends(
+        require_role(
+            UserRole.ADMIN,
+            UserRole.ANALYST,
+        )
+    ),
 ):
     incident = await assign_incident(
         db,
@@ -111,6 +126,12 @@ async def status(
     incident_id: int,
     status: IncidentStatus,
     db: AsyncSession = Depends(get_db),
+    _: User = Depends(
+        require_role(
+            UserRole.ADMIN,
+            UserRole.ANALYST,
+        )
+    ),
 ):
     incident = await update_status(
         db,

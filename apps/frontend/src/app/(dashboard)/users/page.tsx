@@ -1,7 +1,16 @@
 "use client";
 
-import { useUsers } from "@/hooks/use-users";
+import {
+    useUsers,
+    useCurrentUser,
+    useUpdateUserRole,
+    useUpdateUserStatus,
+    useUpdateUserVerification,
+} from "@/hooks/use-users";
 
+import type { UserRole } from "@/types/user";
+
+import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 
 import {
@@ -28,6 +37,19 @@ export default function UsersPage() {
         isLoading,
         error,
     } = useUsers();
+
+    const {
+        data: currentUser,
+    } = useCurrentUser();
+
+    const roleMutation =
+        useUpdateUserRole();
+
+    const statusMutation =
+        useUpdateUserStatus();
+
+    const verificationMutation =
+        useUpdateUserVerification();
 
 
     if (isLoading) {
@@ -128,6 +150,10 @@ export default function UsersPage() {
                                     Created
                                 </TableHead>
 
+                                <TableHead>
+                                    Actions
+                                </TableHead>
+
                             </TableRow>
 
                         </TableHeader>
@@ -138,6 +164,8 @@ export default function UsersPage() {
                             {data?.map((user) => (
 
                                 <TableRow key={user.id}>
+
+                                    {/* User */}
 
                                     <TableCell>
 
@@ -156,10 +184,14 @@ export default function UsersPage() {
                                     </TableCell>
 
 
+                                    {/* Email */}
+
                                     <TableCell>
                                         {user.email}
                                     </TableCell>
 
+
+                                    {/* Role */}
 
                                     <TableCell>
 
@@ -177,6 +209,8 @@ export default function UsersPage() {
 
                                     </TableCell>
 
+
+                                    {/* Status */}
 
                                     <TableCell>
 
@@ -197,6 +231,8 @@ export default function UsersPage() {
                                     </TableCell>
 
 
+                                    {/* Verified */}
+
                                     <TableCell>
 
                                         {user.is_verified
@@ -205,6 +241,8 @@ export default function UsersPage() {
 
                                     </TableCell>
 
+
+                                    {/* Last login */}
 
                                     <TableCell>
 
@@ -217,11 +255,101 @@ export default function UsersPage() {
                                     </TableCell>
 
 
+                                    {/* Created */}
+
                                     <TableCell>
 
                                         {new Date(
                                             user.created_at
                                         ).toLocaleDateString()}
+
+                                    </TableCell>
+
+
+                                    {/* Actions */}
+
+                                    <TableCell>
+
+                                        {currentUser?.id === user.id ? (
+
+                                            <span className="text-sm text-muted-foreground">
+                                                Current user
+                                            </span>
+
+                                        ) : (
+
+                                            <div className="flex flex-wrap items-center gap-2">
+
+                                                <select
+                                                    value={user.role}
+                                                    disabled={roleMutation.isPending}
+                                                    onChange={(event) =>
+                                                        roleMutation.mutate({
+                                                            userId: user.id,
+                                                            role: event.target.value as UserRole,
+                                                        })
+                                                    }
+                                                    className="
+                                                        h-9
+                                                        rounded-md
+                                                        border
+                                                        bg-background
+                                                        px-3
+                                                        text-sm
+                                                    "
+                                                >
+
+                                                    <option value="viewer">
+                                                        Viewer
+                                                    </option>
+
+                                                    <option value="analyst">
+                                                        Analyst
+                                                    </option>
+
+                                                    <option value="admin">
+                                                        Admin
+                                                    </option>
+
+                                                </select>
+
+
+                                                <Button
+                                                    variant="outline"
+                                                    size="sm"
+                                                    disabled={statusMutation.isPending}
+                                                    onClick={() =>
+                                                        statusMutation.mutate({
+                                                            userId: user.id,
+                                                            isActive: !user.is_active,
+                                                        })
+                                                    }
+                                                >
+                                                    {user.is_active
+                                                        ? "Deactivate"
+                                                        : "Activate"}
+                                                </Button>
+
+
+                                                <Button
+                                                    variant="outline"
+                                                    size="sm"
+                                                    disabled={verificationMutation.isPending}
+                                                    onClick={() =>
+                                                        verificationMutation.mutate({
+                                                            userId: user.id,
+                                                            isVerified: !user.is_verified,
+                                                        })
+                                                    }
+                                                >
+                                                    {user.is_verified
+                                                        ? "Unverify"
+                                                        : "Verify"}
+                                                </Button>
+
+                                            </div>
+
+                                        )}
 
                                     </TableCell>
 
