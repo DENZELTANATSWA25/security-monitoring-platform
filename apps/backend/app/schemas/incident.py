@@ -11,13 +11,21 @@ class IncidentCreate(BaseModel):
     severity: str
     event_id: int | None = None
 
+class IncidentCreate(BaseModel):
+    user_id: int
+
+class IncidentAssign(BaseModel):
+    user_id: int
+
+
 class IncidentResponse(BaseModel):
     id: int
     title: str
     description: str
     severity: str
     status: IncidentStatus
-    assigned_to: str | None
+    assigned_to: str | None #temporary legacy display field
+    assigned_user_id: int | None  #actual database user assignment
     event_id: int | None
     created_at: datetime
     updated_at: datetime

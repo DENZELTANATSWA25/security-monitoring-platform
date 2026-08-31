@@ -7,27 +7,39 @@ import { useQueryClient } from "@tanstack/react-query";
 
 import { useIncident } from "@/hooks/use-incidents";
 import {
+    useAssignableUsers,
+    useCurrentUser,
+} from "@/hooks/use-users";
+
+import {
     assignIncident,
     updateIncidentStatus,
 } from "@/services/incident.service";
 
 import type { IncidentStatus } from "@/types/incident";
 
+import { canManageIncidents } from "@/lib/permissions";
+
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+
 import {
     Card,
     CardContent,
     CardHeader,
     CardTitle,
 } from "@/components/ui/card";
-import { Input } from "@/components/ui/input";
 
-import { useCurrentUser } from "@/hooks/use-users";
-import { canManageIncidents } from "@/lib/permissions";
+import {
+    Select,
+    SelectContent,
+    SelectItem,
+    SelectTrigger,
+    SelectValue,
+} from "@/components/ui/select";
+
 
 export default function IncidentDetailsPage() {
-
     const params = useParams();
 
     const id = Number(params.id);
@@ -38,7 +50,7 @@ export default function IncidentDetailsPage() {
         data: currentUser,
     } = useCurrentUser();
 
-    const canManage = 
+    const canManage =
         canManageIncidents(currentUser?.role);
 
     const {
@@ -47,11 +59,26 @@ export default function IncidentDetailsPage() {
         error,
     } = useIncident(id);
 
-    const [analyst, setAnalyst] = useState("");
+    const {
+        data: assignableUsers = [],
+        isLoading: isLoadingAssignableUsers,
+    } = useAssignableUsers();
 
-    const [isAssigning, setIsAssigning] = useState(false);
+    const [
+        selectedUserId,
+        setSelectedUserId,
+    ] = useState("");
 
-    const [isUpdatingStatus, setIsUpdatingStatus] = useState(false);
+    const [
+        isAssigning,
+        setIsAssigning,
+    ] = useState(false);
+
+    const [
+        isUpdatingStatus,
+        setIsUpdatingStatus,
+    ] = useState(false);
+
 
     if (isLoading) {
         return (
@@ -60,6 +87,7 @@ export default function IncidentDetailsPage() {
             </div>
         );
     }
+
 
     if (error || !incident) {
         return (
@@ -78,16 +106,18 @@ export default function IncidentDetailsPage() {
         );
     }
 
-    /*
-     * At this point TypeScript knows the incident exists.
-     *
-     * We store it in a separate constant so TypeScript also
-     * knows it is definitely defined inside our event handlers.
-     */
+
     const currentIncident = incident;
 
+
     async function handleAssign() {
-        if (!analyst.trim()) {
+        if (!selectedUserId) {
+            return;
+        }
+
+        const userId = Number(selectedUserId);
+
+        if (Number.isNaN(userId)) {
             return;
         }
 
@@ -96,13 +126,16 @@ export default function IncidentDetailsPage() {
 
             await assignIncident(
                 currentIncident.id,
-                analyst.trim()
+                userId
             );
 
-            setAnalyst("");
+            setSelectedUserId("");
 
             await queryClient.invalidateQueries({
-                queryKey: ["incident", currentIncident.id],
+                queryKey: [
+                    "incident",
+                    currentIncident.id,
+                ],
             });
 
             await queryClient.invalidateQueries({
@@ -112,6 +145,7 @@ export default function IncidentDetailsPage() {
             setIsAssigning(false);
         }
     }
+
 
     async function handleStatusChange(
         status: IncidentStatus
@@ -125,7 +159,10 @@ export default function IncidentDetailsPage() {
             );
 
             await queryClient.invalidateQueries({
-                queryKey: ["incident", currentIncident.id],
+                queryKey: [
+                    "incident",
+                    currentIncident.id,
+                ],
             });
 
             await queryClient.invalidateQueries({
@@ -135,6 +172,7 @@ export default function IncidentDetailsPage() {
             setIsUpdatingStatus(false);
         }
     }
+
 
     return (
         <div className="space-y-6">
@@ -193,8 +231,6 @@ export default function IncidentDetailsPage() {
 
                     <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
 
-                        {/* Severity */}
-
                         <div>
                             <p className="text-sm text-muted-foreground">
                                 Severity
@@ -205,8 +241,6 @@ export default function IncidentDetailsPage() {
                             </p>
                         </div>
 
-
-                        {/* Status */}
 
                         <div>
                             <p className="text-sm text-muted-foreground">
@@ -219,19 +253,19 @@ export default function IncidentDetailsPage() {
                         </div>
 
 
-                        {/* Assigned Analyst */}
                         <div>
                             <p className="text-sm text-muted-foreground">
                                 Assigned Analyst
                             </p>
 
                             <p className="font-semibold mt-1">
-                                {currentIncident.assigned_to ?? "Unassigned"}
+                                {
+                                    currentIncident.assigned_to
+                                    ?? "Unassigned"
+                                }
                             </p>
                         </div>
 
-
-                        {/* Related Event */}
 
                         <div>
                             <p className="text-sm text-muted-foreground">
@@ -259,108 +293,141 @@ export default function IncidentDetailsPage() {
 
 
             {/* Analyst Assignment */}
-        
+
             {canManage && (
                 <Card>
-                <CardHeader>
-                    <CardTitle>
-                        Analyst Assignment
-                    </CardTitle>
-                </CardHeader>
+                    <CardHeader>
+                        <CardTitle>
+                            Analyst Assignment
+                        </CardTitle>
+                    </CardHeader>
 
-                <CardContent>
+                    <CardContent>
 
-                    <div className="flex gap-3 max-w-xl">
+                        <div className="flex flex-col sm:flex-row gap-3 max-w-xl">
 
-                        <Input
-                            placeholder="Analyst name"
-                            value={analyst}
-                            onChange={(event) =>
-                                setAnalyst(event.target.value)
-                            }
-                        />
+                            <Select
+                                value={selectedUserId}
+                                onValueChange={(value) =>
+                                    setSelectedUserId(value ?? "")
+                                }
+                                disabled={
+                                    isAssigning
+                                    || isLoadingAssignableUsers
+                                }
+                            >
+                                <SelectTrigger className="w-full">
+                                    <SelectValue
+                                        placeholder={
+                                            isLoadingAssignableUsers
+                                                ? "Loading users..."
+                                                : "Select analyst or administrator"
+                                        }
+                                    />
+                                </SelectTrigger>
 
-                        <Button
-                            onClick={handleAssign}
-                            disabled={
-                                isAssigning ||
-                                !analyst.trim()
-                            }
-                        >
-                            {isAssigning
-                                ? "Assigning..."
-                                : "Assign"}
-                        </Button>
+                                <SelectContent>
+                                    {assignableUsers.map(
+                                        (user) => (
+                                            <SelectItem
+                                                key={user.id}
+                                                value={String(user.id)}
+                                            >
+                                                {user.full_name}
+                                                {" — "}
+                                                {user.role}
+                                            </SelectItem>
+                                        )
+                                    )}
+                                </SelectContent>
+                            </Select>
 
-                    </div>
 
-                </CardContent>
-            </Card>
+                            <Button
+                                onClick={handleAssign}
+                                disabled={
+                                    isAssigning
+                                    || !selectedUserId
+                                }
+                            >
+                                {
+                                    isAssigning
+                                        ? "Assigning..."
+                                        : "Assign"
+                                }
+                            </Button>
+
+                        </div>
+
+                    </CardContent>
+                </Card>
             )}
 
 
             {/* Status Management */}
+
             {canManage && (
                 <Card>
-                <CardHeader>
-                    <CardTitle>
-                        Incident Status
-                    </CardTitle>
-                </CardHeader>
+                    <CardHeader>
+                        <CardTitle>
+                            Incident Status
+                        </CardTitle>
+                    </CardHeader>
 
-                <CardContent>
+                    <CardContent>
 
-                    <div className="flex flex-wrap gap-3">
+                        <div className="flex flex-wrap gap-3">
 
-                        <Button
-                            variant="outline"
-                            disabled={isUpdatingStatus}
-                            onClick={() =>
-                                handleStatusChange("OPEN")
-                            }
-                        >
-                            Open
-                        </Button>
-
-
-                        <Button
-                            variant="outline"
-                            disabled={isUpdatingStatus}
-                            onClick={() =>
-                                handleStatusChange("IN_PROGRESS")
-                            }
-                        >
-                            In Progress
-                        </Button>
+                            <Button
+                                variant="outline"
+                                disabled={isUpdatingStatus}
+                                onClick={() =>
+                                    handleStatusChange("OPEN")
+                                }
+                            >
+                                Open
+                            </Button>
 
 
-                        <Button
-                            variant="outline"
-                            disabled={isUpdatingStatus}
-                            onClick={() =>
-                                handleStatusChange("RESOLVED")
-                            }
-                        >
-                            Resolve
-                        </Button>
+                            <Button
+                                variant="outline"
+                                disabled={isUpdatingStatus}
+                                onClick={() =>
+                                    handleStatusChange(
+                                        "IN_PROGRESS"
+                                    )
+                                }
+                            >
+                                In Progress
+                            </Button>
 
 
-                        <Button
-                            variant="outline"
-                            disabled={isUpdatingStatus}
-                            onClick={() =>
-                                handleStatusChange("CLOSED")
-                            }
-                        >
-                            Close
-                        </Button>
+                            <Button
+                                variant="outline"
+                                disabled={isUpdatingStatus}
+                                onClick={() =>
+                                    handleStatusChange("RESOLVED")
+                                }
+                            >
+                                Resolve
+                            </Button>
 
-                    </div>
 
-                </CardContent>
-            </Card>
+                            <Button
+                                variant="outline"
+                                disabled={isUpdatingStatus}
+                                onClick={() =>
+                                    handleStatusChange("CLOSED")
+                                }
+                            >
+                                Close
+                            </Button>
+
+                        </div>
+
+                    </CardContent>
+                </Card>
             )}
-            
 
 
             {/* Incident Timeline */}
@@ -374,10 +441,7 @@ export default function IncidentDetailsPage() {
 
                 <CardContent className="space-y-4">
 
-                    {/* Created */}
-
                     <div className="border-l-2 pl-4">
-
                         <p className="font-semibold">
                             Incident created
                         </p>
@@ -387,14 +451,10 @@ export default function IncidentDetailsPage() {
                                 currentIncident.created_at
                             ).toLocaleString()}
                         </p>
-
                     </div>
 
 
-                    {/* Updated */}
-
                     <div className="border-l-2 pl-4">
-
                         <p className="font-semibold">
                             Last updated
                         </p>
@@ -404,7 +464,6 @@ export default function IncidentDetailsPage() {
                                 currentIncident.updated_at
                             ).toLocaleString()}
                         </p>
-
                     </div>
 
                 </CardContent>

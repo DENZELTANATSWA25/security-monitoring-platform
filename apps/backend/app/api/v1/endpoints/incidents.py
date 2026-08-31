@@ -6,25 +6,27 @@ from fastapi import (
 
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.core.permissions import require_role
 from app.db.session import get_db
-
-from app.schemas.incident import (
-    IncidentCreate,
-    IncidentResponse,
-)
 
 from app.models.incident import IncidentStatus
 from app.models.user import User, UserRole
 
+from app.schemas.incident import (
+    IncidentAssign,
+    IncidentCreate,
+    IncidentResponse,
+)
+
 from app.services.incident_service import (
-    create_incident,
-    get_incidents,
-    get_incident,
     assign_incident,
+    create_incident,
+    get_incident,
+    get_incidents,
     update_status,
 )
 
-from app.core.permissions import require_role
+from app.services.user_service import get_user_by_id
 
 
 router = APIRouter(
@@ -89,12 +91,12 @@ async def read_incident(
 
 
 @router.patch(
-    "/{incident_id}/assign/{analyst}",
+    "/{incident_id}/assign",
     response_model=IncidentResponse,
 )
 async def assign(
     incident_id: int,
-    analyst: str,
+    assignment: IncidentAssign,
     db: AsyncSession = Depends(get_db),
     _: User = Depends(
         require_role(
@@ -103,10 +105,36 @@ async def assign(
         )
     ),
 ):
-    incident = await assign_incident(
+    target_user = await get_user_by_id(
         db,
-        incident_id,
-        analyst,
+        assignment.user_id,
+    )
+
+    if not target_user:
+        raise HTTPException(
+            status_code=404,
+            detail="Assigned user not found",
+        )
+
+    if not target_user.is_active:
+        raise HTTPException(
+            status_code=400,
+            detail="Inactive users cannot be assigned to incidents",
+        )
+
+    if target_user.role not in (
+        UserRole.ADMIN,
+        UserRole.ANALYST,
+    ):
+        raise HTTPException(
+            status_code=400,
+            detail="Only administrators or analysts can be assigned to incidents",
+        )
+
+    incident = await assign_incident(
+        db=db,
+        incident_id=incident_id,
+        user=target_user,
     )
 
     if not incident:

@@ -25,6 +25,7 @@ from app.schemas.user import (
 
 from app.services.user_service import (
     get_all_users,
+    get_assignable_users,
     get_user_by_id,
     update_user_role,
     update_user_status,
@@ -60,6 +61,21 @@ async def read_users_me(
 ):
     return current_user
 
+@router.get(
+        "/assignable",
+        response_model=list[UserResponse],
+)
+async def list_assignable_users(
+    db: AsyncSession = Depends(get_db),
+    _: User = Depends(
+        require_role(
+            UserRole.ADMIN,
+            UserRole.ANALYST,
+        )
+    ),
+):
+    return await get_assignable_users(db)
+
 
 @router.get(
     "/{user_id}",
@@ -84,6 +100,7 @@ async def read_user(
         )
 
     return user
+
 
 
 @router.patch(

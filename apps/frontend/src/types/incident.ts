@@ -10,7 +10,10 @@ export interface Incident {
     description: string;
     severity: string;
     status: IncidentStatus;
-    assigned_to: string | null;
+    
+    assigned_to: string | null; // temporary legacy display field
+
+    assigned_user_id: number | null; // real database-backed assignee
     event_id: number | null;
     created_at: string;
     updated_at: string;

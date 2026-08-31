@@ -73,6 +73,30 @@ async def get_all_users(
     )
     return result.scalars().all()
 
+async def get_assignable_users(
+    db: AsyncSession,
+):
+    """
+    Return active users who are allowed to own incidents.
+    
+    Only admins and analysts can be assigned.
+    """
+    result = await db.execute(
+        select(User)
+        .where(
+            User.is_active.is_(True),
+            User.role.in_(
+                [
+                    UserRole.ADMIN,
+                    UserRole.ANALYST
+                ]
+            ),
+        )
+        .order_by(User.full_name.asc())
+    )
+
+    return result.scalars().all()
+
 async def update_user_role(
         db: AsyncSession,
         user_id: int,

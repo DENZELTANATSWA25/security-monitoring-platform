@@ -23,6 +23,14 @@ export async function getCurrentUser() {
     return response.data;
 }
 
+export async function getAssignableUsers() {
+    const response = await api.get<User[]>(
+        "/users/assignable"
+    );
+
+    return response.data;
+}
+
 
 export async function updateUserRole(
     userId: number,

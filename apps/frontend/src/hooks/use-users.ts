@@ -13,6 +13,7 @@ import {
 import {
     getUsers,
     getCurrentUser,
+    getAssignableUsers,
     updateUserRole,
     updateUserStatus,
     updateUserVerification,
@@ -30,6 +31,13 @@ export function useUsers() {
     return useQuery({
         queryKey: ["users"],
         queryFn: getUsers,
+    });
+}
+
+export function useAssignableUsers() {
+    return useQuery({
+        queryKey: ["assignable-users"],
+        queryFn: getAssignableUsers,
     });
 }
 
@@ -119,3 +127,4 @@ export function useUpdateUserVerification() {
         },
     });
 }
+

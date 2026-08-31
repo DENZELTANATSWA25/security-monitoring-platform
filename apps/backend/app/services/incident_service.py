@@ -6,6 +6,8 @@ from app.models.incident import (
     IncidentStatus,
 )
 
+from app.models.user import User
+
 async def create_incident(
         db: AsyncSession,
         title: str,
@@ -35,6 +37,16 @@ async def get_incidents(
 
     return result.scalars().all()
 
+async def get_incidents(
+        db: AsyncSession,
+):
+    result = await db.execute(
+        select(Incident)
+        .order_by(Incident.created_at.desc())
+    )
+
+    return result.scalars().all()
+
 async def get_incident(
         db: AsyncSession,
         incident_id: int,
@@ -49,7 +61,7 @@ async def get_incident(
 async def assign_incident(
         db: AsyncSession,
         incident_id: int,
-        analyst: str,
+        user: User,
 ):
     incident = await get_incident(
         db,
@@ -59,7 +71,9 @@ async def assign_incident(
     if not incident:
         return None
 
-    incident.assigned_to = analyst
+    incident.assigned_user_id = user.id
+
+    incident.assigned_to = user.full_name
     incident.status = IncidentStatus.IN_PROGRESS
 
     await db.commit()
@@ -83,4 +97,5 @@ async def update_status(
 
     await db.commit()
     await db.refresh(incident)
+
     return incident

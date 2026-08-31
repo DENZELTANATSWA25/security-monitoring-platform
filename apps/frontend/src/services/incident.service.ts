@@ -37,10 +37,13 @@ export async function createIncident(
 
 export async function assignIncident(
     id: number,
-    analyst: string
+    userId: number
 ) {
     const response = await api.patch<Incident>(
-        `/incidents/${id}/assign/${encodeURIComponent(analyst)}`
+        `/incidents/${id}/assign`,
+        {
+            user_id: userId
+        }
     );
 
     return response.data;

@@ -1,5 +1,4 @@
 from datetime import datetime
-
 import enum
 
 from sqlalchemy import (
@@ -14,11 +13,13 @@ from sqlalchemy import (
 
 from app.db.base import Base
 
+
 class IncidentStatus(str, enum.Enum):
     OPEN = "OPEN"
     IN_PROGRESS = "IN_PROGRESS"
     RESOLVED = "RESOLVED"
     CLOSED = "CLOSED"
+
 
 class Incident(Base):
     __tablename__ = "incidents"
@@ -50,9 +51,22 @@ class Incident(Base):
         nullable=False,
     )
 
+    # Temporary legacy field.
+    # Existing incidents may still contain a human-readable assignee here.
     assigned_to = Column(
         String(255),
         nullable=True,
+    )
+
+    # Real assignment to a User record.
+    assigned_user_id = Column(
+        Integer,
+        ForeignKey(
+            "users.id",
+            ondelete="SET NULL",
+        ),
+        nullable=True,
+        index=True,
     )
 
     event_id = Column(
