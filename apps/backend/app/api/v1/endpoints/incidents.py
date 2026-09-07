@@ -11,11 +11,22 @@ from app.db.session import get_db
 
 from app.models.incident import IncidentStatus
 from app.models.user import User, UserRole
+from app.core.dependencies import get_current_user
 
 from app.schemas.incident import (
     IncidentAssign,
     IncidentCreate,
     IncidentResponse,
+)
+
+from app.schemas.incident_note import (
+    IncidentNoteCreate,
+    IncidentNoteResponse,
+)
+
+from app.services.incident_note_service import (
+    create_incident_note,
+    get_incident_notes,
 )
 
 from app.services.incident_service import (
@@ -174,3 +185,77 @@ async def status(
         )
 
     return incident
+
+@router.post(
+    "/{incident_id}/notes",
+    response_model=IncidentNoteResponse,
+)
+async def create_note(
+    incident_id: int,
+    note: IncidentNoteCreate,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(
+        require_role(
+            UserRole.ADMIN,
+            UserRole.ANALYST,
+        )
+    ),
+):
+    """
+    Add an investigation note to an incident
+
+    The authentication analyst/admin is automatically recorded as the author
+    """
+    incident = await get_incident(
+        db,
+        incident_id,
+    )
+
+    if not incident:
+        raise HTTPException(
+            status_code=404,
+            detail="Incident not found",
+        )
+
+    content = note.content.strip()
+
+    if not content:
+        raise HTTPException(
+            status_code=400,
+            detail="Note content cannot be empty",
+        )    
+
+    return await create_incident_note(
+        db=db,
+        incident_id=incident_id,
+        author_user_id=current_user.id,
+        content=note.content,
+    )
+
+@router.get(
+    "/{incident_id}/notes",
+    response_model=list[IncidentNoteResponse],
+)
+async def list_notes(
+    incident_id: int,
+    db: AsyncSession = Depends(get_db),
+    _: User = Depends(get_current_user)
+):
+    """
+    Return the investigation history for an incident
+    """
+    incident = await get_incident(
+        db,
+        incident_id,
+    )
+
+    if not incident:
+        raise HTTPException(
+            status_code=404,
+            detail="Incident not found",
+        )
+
+    return await get_incident_notes(
+        db,
+        incident_id,
+    )

@@ -37,6 +37,7 @@ import {
     SelectTrigger,
     SelectValue,
 } from "@/components/ui/select";
+import InvestigationNotes from "@/components/incidents/investigation-notes";
 
 
 export default function IncidentDetailsPage() {
@@ -428,6 +429,10 @@ export default function IncidentDetailsPage() {
                     </CardContent>
                 </Card>
             )}
+
+            <InvestigationNotes
+                incidentId={currentIncident.id}
+            />
 
 
             {/* Incident Timeline */}

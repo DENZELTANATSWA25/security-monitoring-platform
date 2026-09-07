@@ -4,6 +4,7 @@ from app.models.security_event import SecurityEvent
 from app.models.login_attempt import LoginAttempt
 from app.models.alert import Alert
 from app.models.incident import Incident
+from app.models.incident_note import IncidentNote
 
 __all__ = [
     "User",
@@ -12,4 +13,5 @@ __all__ = [
     "LoginAttempt",
     "Alert",
     "Incident",
+    "IncidentNote",
 ]
