@@ -38,7 +38,7 @@ import {
     SelectValue,
 } from "@/components/ui/select";
 import InvestigationNotes from "@/components/incidents/investigation-notes";
-
+import IncidentActivityTimeline from "@/components/incidents/incident-activity-timeline";
 
 export default function IncidentDetailsPage() {
     const params = useParams();
@@ -142,6 +142,13 @@ export default function IncidentDetailsPage() {
             await queryClient.invalidateQueries({
                 queryKey: ["incidents"],
             });
+
+            await queryClient.invalidateQueries({
+                queryKey: [
+                    "incident-activities",
+                    currentIncident.id,
+                ],
+            });
         } finally {
             setIsAssigning(false);
         }
@@ -168,6 +175,13 @@ export default function IncidentDetailsPage() {
 
             await queryClient.invalidateQueries({
                 queryKey: ["incidents"],
+            });
+
+            await queryClient.invalidateQueries({
+                queryKey: [
+                    "incident-activities",
+                    currentIncident.id,
+                ],
             });
         } finally {
             setIsUpdatingStatus(false);
@@ -437,42 +451,9 @@ export default function IncidentDetailsPage() {
 
             {/* Incident Timeline */}
 
-            <Card>
-                <CardHeader>
-                    <CardTitle>
-                        Incident Timeline
-                    </CardTitle>
-                </CardHeader>
-
-                <CardContent className="space-y-4">
-
-                    <div className="border-l-2 pl-4">
-                        <p className="font-semibold">
-                            Incident created
-                        </p>
-
-                        <p className="text-sm text-muted-foreground">
-                            {new Date(
-                                currentIncident.created_at
-                            ).toLocaleString()}
-                        </p>
-                    </div>
-
-
-                    <div className="border-l-2 pl-4">
-                        <p className="font-semibold">
-                            Last updated
-                        </p>
-
-                        <p className="text-sm text-muted-foreground">
-                            {new Date(
-                                currentIncident.updated_at
-                            ).toLocaleString()}
-                        </p>
-                    </div>
-
-                </CardContent>
-            </Card>
+            <IncidentActivityTimeline
+                incidentId={currentIncident.id}
+            />
 
         </div>
     );

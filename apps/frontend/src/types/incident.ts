@@ -14,7 +14,7 @@ export interface Incident {
     assigned_to: string | null; // temporary legacy display field
 
     assigned_user_id: number | null; // real database-backed assignee
-    event_id: number | null;
+    event_id: number;
     created_at: string;
     updated_at: string;
 }
@@ -23,5 +23,5 @@ export interface IncidentCreate {
     title: string;
     description: string;
     severity: string;
-    event_id?: number | null;
+    event_id: number;
 }
