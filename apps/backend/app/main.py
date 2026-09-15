@@ -1,4 +1,5 @@
 from fastapi import FastAPI
+from fastapi.middleware.cors import CORSMiddleware
 
 from app.api.v1.endpoints import (
     auth,
@@ -13,20 +14,7 @@ from app.api.v1.endpoints import (
     reports
 )
 
-from fastapi.middleware.cors import CORSMiddleware
-
 from app.core.config import settings
-from app.db.init_db import init_database
-from app.db import base
-from app.models import (
-    user,
-    audit_log,
-    security_event,
-    login_attempt,
-    alert,
-    incident,
-)
-
 
 app = FastAPI(
     title=settings.APP_NAME
@@ -42,7 +30,6 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
-
 
 app.include_router(
     auth.router,
@@ -83,11 +70,6 @@ app.include_router(
     reports.router,
     prefix="/api/v1"
 )
-
-@app.on_event("startup")
-async def on_startup():
-    await init_database()
-
 
 @app.get("/")
 async def health_check():

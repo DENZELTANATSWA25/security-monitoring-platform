@@ -3,32 +3,28 @@ from fastapi import (
     Depends,
     HTTPException,
 )
-
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.core.dependencies import get_current_user
 from app.core.permissions import require_role
 from app.db.session import get_db
-
 from app.models.incident import IncidentStatus
 from app.models.user import User, UserRole
-from app.core.dependencies import get_current_user
-
 from app.schemas.incident import (
     IncidentAssign,
     IncidentCreate,
     IncidentResponse,
 )
-
+from app.schemas.incident_activity import IncidentActivityResponse
 from app.schemas.incident_note import (
     IncidentNoteCreate,
     IncidentNoteResponse,
 )
-
+from app.services.incident_activity_service import get_incident_activities
 from app.services.incident_note_service import (
     create_incident_note,
     get_incident_notes,
 )
-
 from app.services.incident_service import (
     assign_incident,
     create_incident,
@@ -36,7 +32,6 @@ from app.services.incident_service import (
     get_incidents,
     update_status,
 )
-
 from app.services.user_service import get_user_by_id
 
 
@@ -53,19 +48,26 @@ router = APIRouter(
 async def create(
     incident: IncidentCreate,
     db: AsyncSession = Depends(get_db),
-    _: User = Depends(
+    current_user: User = Depends(
         require_role(
             UserRole.ADMIN,
             UserRole.ANALYST,
         )
     ),
 ):
+    """
+    Create a new incident.
+
+    The authenticated administrator or analyst is recorded as the actor
+    responsible for creating the incident.
+    """
     return await create_incident(
         db=db,
         title=incident.title,
         description=incident.description,
         severity=incident.severity,
         event_id=incident.event_id,
+        actor_user_id=current_user.id,
     )
 
 
@@ -76,6 +78,7 @@ async def create(
 async def list_incidents(
     db: AsyncSession = Depends(get_db),
 ):
+    """Return all incidents."""
     return await get_incidents(db)
 
 
@@ -87,6 +90,7 @@ async def read_incident(
     incident_id: int,
     db: AsyncSession = Depends(get_db),
 ):
+    """Return a single incident."""
     incident = await get_incident(
         db,
         incident_id,
@@ -109,13 +113,19 @@ async def assign(
     incident_id: int,
     assignment: IncidentAssign,
     db: AsyncSession = Depends(get_db),
-    _: User = Depends(
+    current_user: User = Depends(
         require_role(
             UserRole.ADMIN,
             UserRole.ANALYST,
         )
     ),
 ):
+    """
+    Assign an incident to an active administrator or analyst.
+
+    The authenticated user performing the assignment is recorded separately
+    from the user receiving the assignment.
+    """
     target_user = await get_user_by_id(
         db,
         assignment.user_id,
@@ -146,6 +156,7 @@ async def assign(
         db=db,
         incident_id=incident_id,
         user=target_user,
+        actor_user_id=current_user.id,
     )
 
     if not incident:
@@ -165,17 +176,24 @@ async def status(
     incident_id: int,
     status: IncidentStatus,
     db: AsyncSession = Depends(get_db),
-    _: User = Depends(
+    current_user: User = Depends(
         require_role(
             UserRole.ADMIN,
             UserRole.ANALYST,
         )
     ),
 ):
+    """
+    Change an incident's status.
+
+    The authenticated user performing the transition is recorded in the
+    incident activity timeline.
+    """
     incident = await update_status(
-        db,
-        incident_id,
-        status,
+        db=db,
+        incident_id=incident_id,
+        status=status,
+        actor_user_id=current_user.id,
     )
 
     if not incident:
@@ -185,6 +203,7 @@ async def status(
         )
 
     return incident
+
 
 @router.post(
     "/{incident_id}/notes",
@@ -202,9 +221,10 @@ async def create_note(
     ),
 ):
     """
-    Add an investigation note to an incident
+    Add an investigation note to an incident.
 
-    The authentication analyst/admin is automatically recorded as the author
+    The authenticated administrator or analyst is automatically recorded as
+    both the note author and the actor responsible for the timeline event.
     """
     incident = await get_incident(
         db,
@@ -223,14 +243,15 @@ async def create_note(
         raise HTTPException(
             status_code=400,
             detail="Note content cannot be empty",
-        )    
+        )
 
     return await create_incident_note(
         db=db,
         incident_id=incident_id,
         author_user_id=current_user.id,
-        content=note.content,
+        content=content,
     )
+
 
 @router.get(
     "/{incident_id}/notes",
@@ -239,11 +260,9 @@ async def create_note(
 async def list_notes(
     incident_id: int,
     db: AsyncSession = Depends(get_db),
-    _: User = Depends(get_current_user)
+    _: User = Depends(get_current_user),
 ):
-    """
-    Return the investigation history for an incident
-    """
+    """Return investigation notes for an incident."""
     incident = await get_incident(
         db,
         incident_id,
@@ -258,4 +277,36 @@ async def list_notes(
     return await get_incident_notes(
         db,
         incident_id,
+    )
+
+
+@router.get(
+    "/{incident_id}/activities",
+    response_model=list[IncidentActivityResponse],
+)
+async def list_activities(
+    incident_id: int,
+    db: AsyncSession = Depends(get_db),
+    _: User = Depends(get_current_user),
+):
+    """
+    Return the operational activity timeline for an incident.
+
+    Activities are returned chronologically with actor information
+    eager-loaded for API serialization.
+    """
+    incident = await get_incident(
+        db,
+        incident_id,
+    )
+
+    if not incident:
+        raise HTTPException(
+            status_code=404,
+            detail="Incident not found",
+        )
+
+    return await get_incident_activities(
+        db=db,
+        incident_id=incident_id,
     )

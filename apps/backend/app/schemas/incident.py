@@ -11,9 +11,6 @@ class IncidentCreate(BaseModel):
     severity: str
     event_id: int | None = None
 
-class IncidentCreate(BaseModel):
-    user_id: int
-
 class IncidentAssign(BaseModel):
     user_id: int
 
