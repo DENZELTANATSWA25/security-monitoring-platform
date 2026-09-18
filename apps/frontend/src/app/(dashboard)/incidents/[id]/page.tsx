@@ -40,6 +40,13 @@ import {
 import InvestigationNotes from "@/components/incidents/investigation-notes";
 import IncidentActivityTimeline from "@/components/incidents/incident-activity-timeline";
 
+import { useEvents } from "@/hooks/use-events";
+
+import OriginatingEvent from "@/components/incidents/originating-event";
+import LinkedEvents from "@/components/incidents/linked-events";
+
+import LinkedAlerts from "@/components/incidents/linked-alerts";
+
 export default function IncidentDetailsPage() {
     const params = useParams();
 
@@ -59,6 +66,11 @@ export default function IncidentDetailsPage() {
         isLoading,
         error,
     } = useIncident(id);
+
+    const {
+        data: securityEvents = [],
+        isLoading: isLoadingSecurityEvents,
+    } = useEvents();
 
     const {
         data: assignableUsers = [],
@@ -109,6 +121,11 @@ export default function IncidentDetailsPage() {
 
 
     const currentIncident = incident;
+
+    const originatingEvent = securityEvents.find(
+        (event) =>
+            event.id === currentIncident.event_id
+    );
 
 
     async function handleAssign() {
@@ -305,6 +322,31 @@ export default function IncidentDetailsPage() {
 
                 </CardContent>
             </Card>
+
+            {/* Investigation Evidence */}
+
+            <div>
+                <OriginatingEvent
+                    eventId={currentIncident.event_id}
+                    event={originatingEvent}
+                    isLoading={isLoadingSecurityEvents}
+                />
+
+                <LinkedEvents
+                    incidentId={currentIncident.id}
+                    originatingEventId={
+                        currentIncident.event_id
+                    }
+                    canManage={canManage}
+                />
+            </div>
+
+            {/* Investigation Alerts */}
+
+            <LinkedAlerts
+                incidentId={currentIncident.id}
+                canManage={canManage}
+            />
 
 
             {/* Analyst Assignment */}

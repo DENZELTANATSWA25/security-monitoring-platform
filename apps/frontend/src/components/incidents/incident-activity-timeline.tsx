@@ -2,8 +2,10 @@
 
 import {
     Activity,
+    BellRing,
     CirclePlus,
     FileText,
+    Link2,
     RefreshCcw,
     UserRoundCheck,
 } from "lucide-react";
@@ -45,6 +47,12 @@ function getActivityIcon(
 
         case "NOTE_ADDED":
             return FileText;
+        
+        case "EVENT_LINKED":
+            return Link2;
+        
+        case "ALERT_LINKED":
+            return BellRing;
 
         default:
             return Activity;
@@ -67,6 +75,12 @@ function getActivityTitle(
 
         case "NOTE_ADDED":
             return "Investigation note added";
+        
+        case "EVENT_LINKED":
+            return "Event linked";
+        
+        case "ALERT_LINKED":
+            return "Alert linked";
 
         default:
             return "Incident activity";

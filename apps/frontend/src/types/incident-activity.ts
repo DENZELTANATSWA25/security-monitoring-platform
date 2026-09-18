@@ -4,7 +4,9 @@ export type IncidentActivityType =
     | "INCIDENT_CREATED"
     | "ASSIGNED"
     | "STATUS_CHANGED"
-    | "NOTE_ADDED";
+    | "NOTE_ADDED"
+    | "EVENT_LINKED"
+    | "ALERT_LINKED";
 
 export interface IncidentActivityActor {
     id: number;
@@ -14,8 +16,8 @@ export interface IncidentActivityActor {
 export interface IncidentActivity {
     id: number;
     incident_id: number;
-    actor_user_id: number;
-    actor: IncidentActivityActor;
+    actor_user_id: number | null;
+    actor: IncidentActivityActor | null;
     activity_type: IncidentActivityType;
     description: string;
     old_value: string | null;

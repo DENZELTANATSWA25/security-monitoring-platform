@@ -1,88 +1,102 @@
 "use client";
 
-import { usePathname } from "next/navigation";
-
 import Link from "next/link";
+import { usePathname } from "next/navigation";
 
 import { useCurrentUser } from "@/hooks/use-users";
 import { canViewUsers } from "@/lib/permissions";
 
+
 export default function Sidebar() {
+    const pathname = usePathname();
+
     const {
         data: currentUser,
     } = useCurrentUser();
 
-    const pathname = usePathname();
-    return (
-        <aside className="w-64 min-h-screen border-r bg-slate-950 text-white">
 
+    /**
+     * Determines whether a navigation item represents the current route.
+     *
+     * Dashboard must match "/" exactly, while application sections should
+     * remain active on nested routes such as /incidents/2.
+     */
+    function isActiveRoute(href: string) {
+        if (href === "/") {
+            return pathname === "/";
+        }
+
+        return (
+            pathname === href
+            || pathname.startsWith(`${href}/`)
+        );
+    }
+
+
+    function navigationClassName(href: string) {
+        return [
+            "block rounded p-3 transition-colors",
+            "hover:bg-slate-800",
+            isActiveRoute(href)
+                ? "bg-slate-800"
+                : "",
+        ]
+            .filter(Boolean)
+            .join(" ");
+    }
+
+
+    return (
+        <aside className="min-h-screen w-64 border-r bg-slate-950 text-white">
             <div className="p-6 text-xl font-bold">
                 Security SOC
             </div>
 
             <nav className="space-y-2 p-4">
-
                 <Link
-                href="/"
-                className={`block rounded p-3 hover:bg-slate-800 ${
-                pathname === "/"
-                ? "bg-slate-800"
-                : ""
-                }`}
-                 >
+                    href="/"
+                    className={navigationClassName("/")}
+                >
                     Dashboard
                 </Link>
 
                 <Link
                     href="/alerts"
-                    className={`block rounded p-3 hover:bg-slate-800 ${
-                    pathname === "/alerts"
-                    ? "bg-slate-800"
-                    : ""
-                    }`}
+                    className={navigationClassName("/alerts")}
                 >
                     Alerts
                 </Link>
 
                 <Link
                     href="/incidents"
-                    className="block rounded p-3 hover:bg-slate-800"
-                >                
+                    className={navigationClassName("/incidents")}
+                >
                     Incidents
                 </Link>
 
                 <Link
                     href="/events"
-                    className={'block rounded p-3 hover:bg-slate-800 ${pathname === "/events" ? "bg-slate-800" : ""}'}
+                    className={navigationClassName("/events")}
                 >
                     Events
-                </Link>
-
-                <Link
-                    href="/incidents"
-                    className="block rounded p-3 hover:bg-slate-800"
-                >
-                    Incidents
                 </Link>
 
                 {canViewUsers(currentUser?.role) && (
                     <Link
                         href="/users"
-                        className="block rounded p-3 hover:bg-slate-800"
+                        className={navigationClassName("/users")}
                     >
                         Users
                     </Link>
                 )}
-                
+
                 <Link
                     href="/reports"
-                    className={'block rounded p-3 hover:bg-slate-800 ${pathname === "/reports" ? "bg-slate-800" : ""}'}
+                    className={navigationClassName("/reports")}
                 >
                     Reports
                 </Link>
-
             </nav>
-
         </aside>
     );
 }

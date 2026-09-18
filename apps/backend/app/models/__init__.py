@@ -6,6 +6,8 @@ from app.models.alert import Alert
 from app.models.incident import Incident
 from app.models.incident_note import IncidentNote
 from app.models.incident_activity import IncidentActivity
+from app.models.incident_event_link import IncidentEventLink
+from app.models.incident_alert_link import IncidentAlertLink
 
 __all__ = [
     "User",
@@ -16,4 +18,6 @@ __all__ = [
     "Incident",
     "IncidentNote",
     "IncidentActivity",
+    "IncidentEventLink",
+    "IncidentAlertLink",
 ]

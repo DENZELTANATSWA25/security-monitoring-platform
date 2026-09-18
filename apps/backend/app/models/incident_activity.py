@@ -19,6 +19,8 @@ class IncidentActivityType(str, enum.Enum):
     ASSIGNED= "ASSIGNED"
     STATUS_CHANGED = "STATUS_CHANGED"
     NOTE_ADDED = "NOTE_ADDED"
+    EVENT_LINKED = "EVENT_LINKED"
+    ALERT_LINKED = "ALERT_LINKED"
 
 class IncidentActivity(Base):
     __tablename__ = "incident_activities"

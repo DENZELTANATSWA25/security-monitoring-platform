@@ -15,6 +15,10 @@ from app.schemas.incident import (
     IncidentCreate,
     IncidentResponse,
 )
+from app.schemas.incident_link import (
+    IncidentAlertLinkResponse,
+    IncidentEventLinkResponse,
+)
 from app.schemas.incident_activity import IncidentActivityResponse
 from app.schemas.incident_note import (
     IncidentNoteCreate,
@@ -32,7 +36,18 @@ from app.services.incident_service import (
     get_incidents,
     update_status,
 )
+from app.services.incident_link_service import (
+    IncidentAlertAlreadyLinkedError,
+    IncidentEventAlreadyLinkedError,
+    get_incident_alert_links,
+    get_incident_event_links,
+    incident_alert_link_exists,
+    incident_event_link_exists,
+    link_alert_to_incident,
+    link_event_to_incident,
+)
 from app.services.user_service import get_user_by_id
+
 
 
 router = APIRouter(
@@ -310,3 +325,194 @@ async def list_activities(
         db=db,
         incident_id=incident_id,
     )
+
+@router.get(
+    "/{incident_id}/events",
+    response_model=list[IncidentEventLinkResponse],
+)
+async def list_linked_events(
+    incident_id: int,
+    db: AsyncSession = Depends(get_db),
+    _: User = Depends(get_current_user),
+):
+    """
+    Return additional security events linked to an incident.
+
+    The incident's originating event is stored separately in the Incident.event_id.
+    This endpoint returns events linked later during investigation.
+    """
+    incident = await get_incident(
+        db,
+        incident_id,
+    )
+
+    if not incident:
+        raise HTTPException(
+            status_code=404,
+            detail="Incident not found",
+        )
+
+    return await get_incident_event_links(
+        db=db,
+        incident_id=incident_id,
+    )
+
+@router.post(
+    "/{incident_id}/events/{event_id}",
+    response_model=IncidentEventLinkResponse,
+    status_code=201,
+)
+async def link_event(
+    incident_id: int,
+    event_id: int,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(
+        require_role(
+            UserRole.ADMIN,
+            UserRole.ANALYST,
+        )
+    ),
+):
+    """
+    Link an additional security event to an incident.
+
+    The linkage and its incident timeline activity are committed as one database transaction.
+    """
+    incident = await get_incident(
+        db,
+        incident_id,
+    )
+
+    if not incident:
+        raise HTTPException(
+            status_code=404,
+            detail="Incident not found",
+        )
+
+    # The originating event is already directly associated with the incident.
+    # It must not also be duplicated in the additional-event linkage table.
+    if incident.event_id == event_id:
+        raise HTTPException(
+            status_code=409,
+            detail="Event is already the originating event for this incident.",
+        )
+
+    if await incident_event_link_exists(
+        db=db,
+        incident_id=incident_id,
+        event_id=event_id,
+    ):
+        raise HTTPException(
+            status_code=409,
+            detail="Event is already linked to this incident.",
+        )
+
+    try:
+        link = await link_event_to_incident(
+            db=db,
+            incident_id=incident_id,
+            event_id=event_id,
+            actor_user_id=current_user.id
+        )
+    except IncidentEventAlreadyLinkedError:
+        raise HTTPException(
+            status_code=409,
+            detail="Event is already linked to this incident.",
+        )
+
+    if link is None:
+        raise HTTPException(
+            status_code=404,
+            detail="Security event not found.",
+        )
+
+    return link
+
+@router.get(
+    "/{incident_id}/alerts",
+    response_model=list[IncidentAlertLinkResponse],
+)
+async def list_linked_alerts(
+    incident_id: int,
+    db: AsyncSession = Depends(get_db),
+    _: User = Depends(get_current_user),
+):
+    # Return alerts linked to an incident investigation.
+    incident = await get_incident(
+        db,
+        incident_id,
+    )
+
+    if not incident:
+        raise HTTPException(
+            status_code=404,
+            detail="Incident not found",
+        )
+
+    return await get_incident_alert_links(
+        db=db,
+        incident_id=incident_id,
+    )
+
+@router.post(
+    "/{incident_id}/alerts/{alert_id}",
+    response_model=IncidentAlertLinkResponse,
+    status_code=201,
+)
+async def link_alert(
+    incident_id: int,
+    alert_id: int,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(
+        require_role(
+            UserRole.ADMIN,
+            UserRole.ANALYST,
+        )
+    ),
+):
+    """
+    Link an alert to an incident investigation.
+
+    The linkage and its incident timeline activity are committed as one database transaction.
+    """
+    incident = await get_incident(
+        db,
+        incident_id,
+    )
+
+    if not incident:
+        raise HTTPException(
+            status_code=404,
+            detail="Incident not found",
+        )
+
+    if await incident_alert_link_exists(
+        db=db,
+        incident_id=incident_id,
+        alert_id=alert_id,
+    ):
+        raise HTTPException(
+            status_code=409,
+            detail="Alert is already linked to this incident.",
+        )
+
+    try:
+        link = await link_alert_to_incident(
+            db=db,
+            incident_id=incident_id,
+            alert_id=alert_id,
+            actor_user_id=current_user.id,
+        )
+    except IncidentAlertAlreadyLinkedError:
+        raise HTTPException(
+            status_code=409,
+            detail="Alert is already linked to this incident."
+        )
+
+    if link is None:
+        raise HTTPException(
+            status_code=404,
+            detail="Alert not found.",
+        )
+
+    return link
