@@ -4,6 +4,7 @@ import {
     Activity,
     BellRing,
     CirclePlus,
+    FileKey2,
     FileText,
     Link2,
     RefreshCcw,
@@ -54,6 +55,9 @@ function getActivityIcon(
         case "ALERT_LINKED":
             return BellRing;
 
+        case "EVIDENCE_ADDED":
+            return FileKey2;
+
         default:
             return Activity;
     }
@@ -81,6 +85,9 @@ function getActivityTitle(
         
         case "ALERT_LINKED":
             return "Alert linked";
+
+        case "EVIDENCE_ADDED":
+            return "Evidence added";
 
         default:
             return "Incident activity";

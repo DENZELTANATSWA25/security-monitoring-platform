@@ -39,6 +39,7 @@ import {
 } from "@/components/ui/select";
 import InvestigationNotes from "@/components/incidents/investigation-notes";
 import IncidentActivityTimeline from "@/components/incidents/incident-activity-timeline";
+import IncidentEvidence from "@/components/incidents/incident-evidence";
 
 import { useEvents } from "@/hooks/use-events";
 
@@ -344,6 +345,12 @@ export default function IncidentDetailsPage() {
             {/* Investigation Alerts */}
 
             <LinkedAlerts
+                incidentId={currentIncident.id}
+                canManage={canManage}
+            />
+
+            {/* Investigation Evidence / Artifacts */}
+            <IncidentEvidence
                 incidentId={currentIncident.id}
                 canManage={canManage}
             />

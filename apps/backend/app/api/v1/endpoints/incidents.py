@@ -19,11 +19,18 @@ from app.schemas.incident_link import (
     IncidentAlertLinkResponse,
     IncidentEventLinkResponse,
 )
+
 from app.schemas.incident_activity import IncidentActivityResponse
 from app.schemas.incident_note import (
     IncidentNoteCreate,
     IncidentNoteResponse,
 )
+
+from app.schemas.incident_evidence import (
+    IncidentEvidenceCreate,
+    IncidentEvidenceResponse,
+)
+
 from app.services.incident_activity_service import get_incident_activities
 from app.services.incident_note_service import (
     create_incident_note,
@@ -45,6 +52,11 @@ from app.services.incident_link_service import (
     incident_event_link_exists,
     link_alert_to_incident,
     link_event_to_incident,
+)
+
+from app.services.incident_evidence_service import (
+    create_incident_evidence,
+    get_incident_evidence,
 )
 from app.services.user_service import get_user_by_id
 
@@ -516,3 +528,75 @@ async def link_alert(
         )
 
     return link
+
+@router.get(
+    "/{incident_id}/evidence",
+    response_model=list[IncidentEvidenceResponse],
+)
+async def list_evidence(
+    incident_id: int,
+    db: AsyncSession = Depends(get_db),
+    _: User = Depends(get_current_user),
+):
+    """
+    Return investigation evidence associated with an incident.
+
+    All authenticated users may inspect evidence.
+    """
+    incident = await get_incident(
+        db,
+        incident_id,
+    )
+
+    if not incident:
+        raise HTTPException(
+            status_code=404,
+            detail="Incident not found",
+        )
+
+    return await get_incident_evidence(
+        db=db,
+        incident_id=incident_id,
+    )
+
+@router.post(
+    "/{incident_id}/evidence",
+    response_model=IncidentEvidenceResponse,
+    status_code=201,
+)
+async def add_evidence(
+    incident_id: int,
+    evidence: IncidentEvidenceCreate,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(
+        require_role(
+            UserRole.ADMIN,
+            UserRole.ANALYST,
+        )
+    ),
+):
+    """
+    Add evidence to an incident investigation.
+
+    The authenticated administrator or analyst is recorded as the evidence author and as the actor in the incident activity timeline.
+    """
+    incident = await get_incident(
+        db,
+        incident_id,
+    )
+
+    if not incident:
+        raise HTTPException(
+            status_code=404,
+            detail="Incident not found",
+        )
+
+    return await create_incident_evidence(
+        db=db,
+        incident_id=incident_id,
+        evidence_type=evidence.evidence_type,
+        value=evidence.value,
+        description=evidence.description,
+        source=evidence.source,
+        added_by_user_id=current_user.id,
+    )
