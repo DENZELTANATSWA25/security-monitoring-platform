@@ -16,12 +16,14 @@ from sqlalchemy.orm import relationship
 
 class IncidentActivityType(str, enum.Enum):
     INCIDENT_CREATED = "INCIDENT_CREATED"
-    ASSIGNED= "ASSIGNED"
+    ASSIGNED = "ASSIGNED"
     STATUS_CHANGED = "STATUS_CHANGED"
     NOTE_ADDED = "NOTE_ADDED"
     EVENT_LINKED = "EVENT_LINKED"
     ALERT_LINKED = "ALERT_LINKED"
     EVIDENCE_ADDED = "EVIDENCE_ADDED"
+    RESOLUTION_ADDED = "RESOLUTION_ADDED"
+    RESOLUTION_UPDATED = "RESOLUTION_UPDATED"
 
 class IncidentActivity(Base):
     __tablename__ = "incident_activities"

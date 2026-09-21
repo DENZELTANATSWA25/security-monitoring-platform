@@ -2,6 +2,7 @@
 
 import {
     Activity,
+    BadgeCheck,
     BellRing,
     CirclePlus,
     FileKey2,
@@ -58,6 +59,10 @@ function getActivityIcon(
         case "EVIDENCE_ADDED":
             return FileKey2;
 
+        case "RESOLUTION_ADDED":
+        case "RESOLUTION_UPDATED":
+            return BadgeCheck;
+
         default:
             return Activity;
     }
@@ -88,6 +93,12 @@ function getActivityTitle(
 
         case "EVIDENCE_ADDED":
             return "Evidence added";
+        
+        case "RESOLUTION_ADDED":
+            return "Resolution added";
+        
+        case "RESOLUTION_UPDATED":
+            return "Resolution updated";
 
         default:
             return "Incident activity";

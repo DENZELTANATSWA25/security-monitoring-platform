@@ -7,7 +7,9 @@ export type IncidentActivityType =
     | "NOTE_ADDED"
     | "EVENT_LINKED"
     | "ALERT_LINKED"
-    | "EVIDENCE_ADDED";
+    | "EVIDENCE_ADDED"
+    | "RESOLUTION_ADDED"
+    | "RESOLUTION_UPDATED";
 
 export interface IncidentActivityActor {
     id: number;

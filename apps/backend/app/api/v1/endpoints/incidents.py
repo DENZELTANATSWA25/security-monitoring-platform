@@ -3,6 +3,7 @@ from fastapi import (
     Depends,
     HTTPException,
 )
+from fastapi import status as http_status
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.dependencies import get_current_user
@@ -25,6 +26,14 @@ from app.schemas.incident_note import (
     IncidentNoteCreate,
     IncidentNoteResponse,
 )
+from app.schemas.incident_resolution import (
+    IncidentResolutionResponse,
+    IncidentResolutionUpsert,
+)
+from app.services.incident_resolution_service import (
+    get_incident_resolution,
+    upsert_incident_resolution,
+)
 
 from app.schemas.incident_evidence import (
     IncidentEvidenceCreate,
@@ -37,6 +46,8 @@ from app.services.incident_note_service import (
     get_incident_notes,
 )
 from app.services.incident_service import (
+    IncidentResolutionRequiredError,
+    InvalidIncidentStatusTransitionError,
     assign_incident,
     create_incident,
     get_incident,
@@ -199,6 +210,10 @@ async def assign(
     "/{incident_id}/status/{status}",
     response_model=IncidentResponse,
 )
+@router.patch(
+    "/{incident_id}/status/{status}",
+    response_model=IncidentResponse,
+)
 async def status(
     incident_id: int,
     status: IncidentStatus,
@@ -211,21 +226,34 @@ async def status(
     ),
 ):
     """
-    Change an incident's status.
+    Change an incident's lifecycle status.
 
-    The authenticated user performing the transition is recorded in the
-    incident activity timeline.
+    Invalid lifecycle transitions are rejected. A documented resolution
+    must exist before an incident can transition to RESOLVED.
     """
-    incident = await update_status(
-        db=db,
-        incident_id=incident_id,
-        status=status,
-        actor_user_id=current_user.id,
-    )
+    try:
+        incident = await update_status(
+            db=db,
+            incident_id=incident_id,
+            status=status,
+            actor_user_id=current_user.id,
+        )
+
+    except IncidentResolutionRequiredError as exc:
+        raise HTTPException(
+            status_code=http_status.HTTP_409_CONFLICT,
+            detail=str(exc),
+        ) from exc
+
+    except InvalidIncidentStatusTransitionError as exc:
+        raise HTTPException(
+            status_code=http_status.HTTP_409_CONFLICT,
+            detail=str(exc),
+        ) from exc
 
     if not incident:
         raise HTTPException(
-            status_code=404,
+            status_code=http_status.HTTP_404_NOT_FOUND,
             detail="Incident not found",
         )
 
@@ -599,4 +627,75 @@ async def add_evidence(
         description=evidence.description,
         source=evidence.source,
         added_by_user_id=current_user.id,
+    )
+
+@router.get(
+    "/{incident_id}/resolution",
+    response_model=IncidentResolutionResponse,
+)
+async def read_incident_resolution(
+    incident_id: int,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+) -> IncidentResolutionResponse:
+    """Return the current investigation resolution for an incident."""
+
+    incident = await get_incident(
+        db,
+        incident_id,
+    )
+
+    if incident is None:
+        raise HTTPException(
+            status_code=http_status.HTTP_404_NOT_FOUND,
+            detail="Incident not found",
+        )
+
+    resolution = await get_incident_resolution(
+        db,
+        incident_id,
+    )
+
+    if resolution is None:
+        raise HTTPException(
+            status_code=http_status.HTTP_404_NOT_FOUND,
+            detail="Incident resolution not found",
+        )
+
+    return resolution
+
+
+@router.put(
+    "/{incident_id}/resolution",
+    response_model=IncidentResolutionResponse,
+)
+async def put_incident_resolution(
+    incident_id: int,
+    resolution_data: IncidentResolutionUpsert,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(
+        require_role(
+            UserRole.ADMIN,
+            UserRole.ANALYST,
+        )
+    ),
+) -> IncidentResolutionResponse:
+    """Create or update the investigation resolution for an incident."""
+
+    incident = await get_incident(
+        db,
+        incident_id,
+    )
+
+    if incident is None:
+        raise HTTPException(
+            status_code=http_status.HTTP_404_NOT_FOUND,
+            detail="Incident not found",
+        )
+
+    return await upsert_incident_resolution(
+        db,
+        incident_id=incident_id,
+        resolution_data=resolution_data,
+        actor_user_id=current_user.id,
     )

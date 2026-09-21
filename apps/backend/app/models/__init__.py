@@ -9,6 +9,7 @@ from app.models.incident_activity import IncidentActivity
 from app.models.incident_event_link import IncidentEventLink
 from app.models.incident_alert_link import IncidentAlertLink
 from app.models.incident_evidence import IncidentEvidence
+from app.models.incident_resolution import IncidentResolution
 
 __all__ = [
     "User",
@@ -22,4 +23,5 @@ __all__ = [
     "IncidentEventLink",
     "IncidentAlertLink",
     "IncidentEvidence",
+    "IncidentResolution",
 ]

@@ -62,7 +62,7 @@ export function useAddIncidentEvidence(
                 
                 queryClient.invalidateQueries({
                     queryKey: [
-                        "incident-activity",
+                        "incident-activities",
                         incidentId,
                     ],
                 }),
