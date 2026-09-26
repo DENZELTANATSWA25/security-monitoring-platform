@@ -13,6 +13,7 @@ from app.services.alert_service import (
 
 from app.core.permissions import require_role
 from app.models.user import User, UserRole
+from app.core.dependencies import get_current_user
 
 router = APIRouter(
     prefix="/alerts",
@@ -25,6 +26,7 @@ router = APIRouter(
 )
 async def list_alerts(
     db: AsyncSession = Depends(get_db),
+    _: User = Depends(get_current_user)
 ):
     return await get_alerts(db)
 
@@ -36,7 +38,9 @@ async def list_alerts(
 async def read_alert(
     alert_id: int,
     db: AsyncSession = Depends(get_db),
+    _: User = Depends(get_current_user)
 ):
+    """Return a single alert to an authenticated user."""
     alert = await get_alert_by_id(db, alert_id)
 
     if not alert:
@@ -44,6 +48,7 @@ async def read_alert(
             status_code=404,
             detail="Alert not found"
         )
+    
     return alert
 
 @router.patch(

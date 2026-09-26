@@ -8,8 +8,16 @@ async def create_alert(
     db: AsyncSession,
     alert_type: str,
     severity: str,
-    message: str,
-):
+    message: str
+) -> Alert:
+    """
+    Create a new alert or update an existing unresolved alert.
+    
+    This function deliberately does not commit the transaction.
+    Transaction ownership belongs to the calling workflow so that alerts 
+    can be persisted atomically with the operation that generated them.
+    """
+
     result = await db.execute(
         select(Alert).where(
             Alert.alert_type == alert_type,
@@ -17,7 +25,6 @@ async def create_alert(
             Alert.resolved.is_(False)
         )
     )
-
     existing_alert = result.scalar_one_or_none()
 
     if existing_alert:
@@ -25,21 +32,18 @@ async def create_alert(
         existing_alert.message = message
         existing_alert.created_at = func.now()
 
-        await db.commit()
-        await db.refresh(existing_alert)
-
+        await db.flush()
         return existing_alert
 
     alert = Alert(
         alert_type=alert_type,
         severity=severity,
         message=message,
-        resolved=False,
+        resolved=False
     )
 
     db.add(alert)
-    await db.commit()
-    await db.refresh(alert)
+    await db.flush()
 
     return alert
 

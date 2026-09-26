@@ -115,6 +115,7 @@ async def create(
 )
 async def list_incidents(
     db: AsyncSession = Depends(get_db),
+    _: User = Depends(get_current_user),
 ):
     """Return all incidents."""
     return await get_incidents(db)
@@ -127,6 +128,7 @@ async def list_incidents(
 async def read_incident(
     incident_id: int,
     db: AsyncSession = Depends(get_db),
+    _: User = Depends(get_current_user),
 ):
     """Return a single incident."""
     incident = await get_incident(
@@ -210,10 +212,7 @@ async def assign(
     "/{incident_id}/status/{status}",
     response_model=IncidentResponse,
 )
-@router.patch(
-    "/{incident_id}/status/{status}",
-    response_model=IncidentResponse,
-)
+
 async def status(
     incident_id: int,
     status: IncidentStatus,

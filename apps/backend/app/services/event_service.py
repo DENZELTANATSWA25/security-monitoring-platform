@@ -1,74 +1,92 @@
+from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from sqlalchemy import select
-
+from app.core.websocket_manager import manager
 from app.models.security_event import SecurityEvent
 from app.schemas.security_event import SecurityEventCreate
 from app.services.alert_service import create_alert
 from app.services.detection.engine import run_detection
 
-from app.core.websocket_manager import manager
-
-
 
 async def create_event(
     db: AsyncSession,
-    event_data: SecurityEventCreate
-):
+    event_data: SecurityEventCreate,
+) -> SecurityEvent:
+    """
+    Create a security event and run detection against it.
 
-    # prevent duplicate active brute-force events
+    Database changes produced by this workflow are committed together.
+    The WebSocket notification is sent only after the database transaction
+    has completed successfully.
+    """
 
+    # Existing behaviour retained temporarily.
+    #
+    # We will revisit event deduplication separately because identical
+    # security events may represent distinct occurrences and should not
+    # necessarily be collapsed.
     existing = await db.execute(
-        select(SecurityEvent)
-        .where(
+        select(SecurityEvent).where(
             SecurityEvent.event_type == event_data.event_type,
-            SecurityEvent.message == event_data.description
+            SecurityEvent.message == event_data.description,
         )
     )
 
     duplicate = existing.scalar_one_or_none()
 
-
     if duplicate:
         return duplicate
 
-   
-    #Create the event
     event = SecurityEvent(
         event_type=event_data.event_type,
         severity=event_data.severity,
         source=event_data.source,
         message=event_data.description,
         user_id=event_data.user_id,
-        event_metadata=event_data.event_metadata
+        event_metadata=event_data.event_metadata,
     )
 
     db.add(event)
-    await db.commit()
-    await db.refresh(event)
 
-    #run the detection engine
-    metadata = event_data.event_metadata or {}
-    
-    context = {
-         "email": event_data.event_metadata.get("email"),
-         "ip": event_data.event_metadata.get("ip"),
-        "event": event
+    try:
+        # Flush so the event receives its database-generated ID while
+        # keeping the transaction open.
+        await db.flush()
+
+        metadata = event_data.event_metadata or {}
+
+        context = {
+            "email": metadata.get("email"),
+            "ip": metadata.get("ip"),
+            "event": event,
         }
 
-    results = await run_detection(
-         db,
-        context
-    )
-
-    for result in results:
-        await create_alert(
-            db=db,
-            alert_type=result["alert_type"],
-            severity=result["severity"],
-            message=result["message"]
+        results = await run_detection(
+            db,
+            context,
         )
 
+        for result in results:
+            await create_alert(
+                db=db,
+                alert_type=result["alert_type"],
+                severity=result["severity"],
+                message=result["message"],
+            )
+
+        # Event and generated alerts become permanent together.
+        await db.commit()
+
+    except Exception:
+        # Restore the session to a usable state and ensure partial
+        # ingestion is never persisted.
+        await db.rollback()
+        raise
+
+    await db.refresh(event)
+
+    # External side effects happen after the database commit because a
+    # WebSocket message cannot participate in a database rollback.
     await manager.broadcast(
         {
             "type": "security_event",
@@ -79,10 +97,8 @@ async def create_event(
                 "source": event.source,
                 "message": event.message,
                 "created_at": event.created_at.isoformat(),
-            }
+            },
         }
     )
 
     return event
-        
-        

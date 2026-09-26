@@ -1,6 +1,6 @@
 from datetime import datetime
 
-from pydantic import BaseModel, Field, field_validator
+from pydantic import BaseModel, Field, field_validator, ConfigDict
 
 from app.models.incident_evidence import EvidenceType
 from app.models.user import UserRole
@@ -70,8 +70,7 @@ class IncidentEvidenceAuthor(BaseModel):
     full_name: str
     role: UserRole
 
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)
 
 class IncidentEvidenceResponse(BaseModel):
     # Evidence representation returned to the API.
@@ -86,5 +85,4 @@ class IncidentEvidenceResponse(BaseModel):
     added_by: IncidentEvidenceAuthor | None
     created_at: datetime
 
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)

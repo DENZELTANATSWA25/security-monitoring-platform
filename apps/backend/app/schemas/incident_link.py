@@ -1,7 +1,7 @@
 from datetime import datetime
 from typing import Any
 
-from pydantic import BaseModel
+from pydantic import BaseModel, ConfigDict
 
 from app.models.security_event import EventSeverity
 
@@ -10,8 +10,7 @@ class LinkedByUserResponse(BaseModel):
     id: int
     full_name: str
 
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)
 
 class LinkedSecurityEventResponse(BaseModel):
     #Security event information exposed through an incident linkage
@@ -24,8 +23,7 @@ class LinkedSecurityEventResponse(BaseModel):
     event_metadata: dict[str, Any] | None
     created_at: datetime
 
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)
 
 class LinkedAlertResponse(BaseModel):
     #Alert information exposed through a linkage
@@ -36,8 +34,7 @@ class LinkedAlertResponse(BaseModel):
     resolved: bool
     created_at: datetime
 
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)
 
 class IncidentEventLinkResponse(BaseModel):
     # Response representation of an event linked to an incident
@@ -49,8 +46,7 @@ class IncidentEventLinkResponse(BaseModel):
     linked_by: LinkedByUserResponse | None
     created_at: datetime
 
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)
 
 class IncidentAlertLinkResponse(BaseModel):
     # Response representation of an alert linked to an incident
@@ -62,5 +58,4 @@ class IncidentAlertLinkResponse(BaseModel):
     linked_by: LinkedByUserResponse | None
     created_at: datetime
 
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)

@@ -48,5 +48,6 @@ async def create_security_event(
 )
 async def list_security_events(
     db: AsyncSession = Depends(get_db),
+    _: User = Depends(get_current_user)
 ):
     return await get_all_events(db)
