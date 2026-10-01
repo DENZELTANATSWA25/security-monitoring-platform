@@ -11,6 +11,7 @@ from app.models.security_event import EventSeverity, SecurityEvent
 from app.schemas.security_event import SecurityEventCreate
 from app.services.event_service import create_event
 from app.models.alert import Alert
+from app.services.detection.result import DetectionResult
 
 
 async def test_event_can_be_created_without_metadata(
@@ -134,12 +135,11 @@ async def test_event_is_rolled_back_when_alert_creation_fails(
     )
 
     detection_result = [
-        {
-            "triggered": True,
-            "alert_type": "TEST_ALERT",
-            "severity": "CRITICAL",
-            "message": "Simulated detection alert.",
-        }
+        DetectionResult.triggered_alert(
+            alert_type="TEST_ALERT",
+            severity="CRITICAL",
+            message="Simulated detection alert.",
+        )
     ]
 
     with patch(
@@ -199,18 +199,16 @@ async def test_event_and_flushed_alert_are_rolled_back_when_later_alert_fails(
     )
 
     detection_results = [
-        {
-            "triggered": True,
-            "alert_type": alert_type,
-            "severity": "CRITICAL",
-            "message": "First alert should eventually be rolled back.",
-        },
-        {
-            "triggered": True,
-            "alert_type": "SECOND_ATOMIC_TEST_ALERT",
-            "severity": "CRITICAL",
-            "message": "Second alert triggers simulated failure.",
-        },
+        DetectionResult.triggered_alert(
+            alert_type=alert_type,
+            severity="CRITICAL",
+            message="First alert should eventually be rolled back.",
+        ),
+        DetectionResult.triggered_alert(
+            alert_type="SECOND_ATOMIC_TEST_ALERT",
+            severity="CRITICAL",
+            message="Second alert triggers simulated failure.",
+        ),
     ]
 
     # Import the real implementation before patching the symbol used by
@@ -273,3 +271,45 @@ async def test_event_and_flushed_alert_are_rolled_back_when_later_alert_fails(
 
     assert persisted_event is None
     assert persisted_alert is None
+
+async def test_fifth_event_from_same_source_creates_event_burst_alert(
+    db_session: AsyncSession,
+) -> None:
+    """
+    Five recent security events from the same source should generate an
+    EVENT_BURST alert through the complete event-ingestion workflow.
+    """
+
+    source = "burst-integration-source"
+
+    for index in range(5):
+        event_data = SecurityEventCreate(
+            event_type=f"BURST_INTEGRATION_EVENT_{index}",
+            severity=EventSeverity.WARNING,
+            source=source,
+            description=f"Burst integration event {index}",
+            event_metadata={
+                "ip": "203.0.113.50",
+            },
+        )
+
+        await create_event(
+            db=db_session,
+            event_data=event_data,
+        )
+
+    result = await db_session.execute(
+        select(Alert).where(
+            Alert.alert_type == "EVENT_BURST",
+        )
+    )
+
+    alerts = result.scalars().all()
+
+    assert len(alerts) == 1
+
+    alert = alerts[0]
+
+    assert alert.severity == "HIGH"
+    assert alert.message is not None
+    assert source in alert.message

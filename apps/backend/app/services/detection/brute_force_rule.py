@@ -1,6 +1,9 @@
-from sqlalchemy.ext.asyncio import AsyncSession
+# Detection rule for repeated failed authentication attempts.
 
-from app.services.detection.base import DetectionRule
+from sqlalchemy.ext.asyncio import AsyncSession
+from app.services.detection.base import DetectionRule, DetectionContext
+
+from app.services.detection.result import DetectionResult
 from app.services.login_attempt_service import count_failed_attempts
 
 class BruteForceRule(DetectionRule):
@@ -8,32 +11,30 @@ class BruteForceRule(DetectionRule):
 
     name = "BRUTE_FORCE_ATTACK"
 
+    FAILED_ATTEMPTS_THRESHOLD = 5
+
     async def evaluate(
             self,
             db: AsyncSession,
-            context: dict
-    ):
-        email = context.get("email")
+            context: DetectionContext,
+    ) -> DetectionResult:
+        attempt = context.login_attempt
 
-        # This rule only applies when an account/email is known.
-        if not email:
-            return {
-                "triggered": False
-            }
+        if attempt is None or attempt.successful:
+            return DetectionResult.not_triggered()
+
+        email = attempt.email
         
         failed_count = await count_failed_attempts(
             db,
             email
         )
 
-        if failed_count >= 5:
-            return {
-                "triggered": True,
-                "alert_type": "BRUTE_FORCE_ATTACK",
-                "severity": "CRITICAL",
-                "message": f"Brute force attack detected on {email}"
-            }
+        if failed_count < self.FAILED_ATTEMPTS_THRESHOLD:
+            return DetectionResult.not_triggered()
         
-        return {
-            "triggered": False
-        }
+        return DetectionResult.triggered_alert(
+            alert_type=self.name,
+            severity="CRITICAL",
+            message=f"Brute force attack detected on {email}"
+        )

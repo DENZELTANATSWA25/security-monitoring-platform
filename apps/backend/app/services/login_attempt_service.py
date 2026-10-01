@@ -4,6 +4,7 @@ from datetime import datetime, timedelta
 from sqlalchemy import select, func
 
 from app.models.login_attempt import LoginAttempt
+from app.services.detection.base import DetectionContext
 
 async def record_login_attempt(
     db: AsyncSession,
@@ -32,25 +33,24 @@ async def record_login_attempt(
         await db.flush()
 
         if not successful:
-            # Local imports avoid the circular dependency between the
-            # login-attempt and detection services.
+            # Local imports avoid the circular dependency between the login-attempt and detection services.
+
             from app.services.alert_service import create_alert
             from app.services.detection.engine import run_detection
 
-            detections = await run_detection(
+            detection = await run_detection(
                 db,
-                {
-                    "email": email,
-                    "ip": attempt.ip_address,
-                },
+                DetectionContext(
+                    login_attempt=attempt,
+                ),
             )
 
-            for detection in detections:
+            for detection in detection:
                 await create_alert(
                     db=db,
-                    alert_type=detection["alert_type"],
-                    severity=detection["severity"],
-                    message=detection["message"],
+                    alert_type=detection.alert_type,
+                    severity=detection.severity,
+                    message=detection.message,
                 )
 
         await db.commit()

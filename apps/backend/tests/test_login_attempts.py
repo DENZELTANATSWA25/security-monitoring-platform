@@ -12,6 +12,7 @@ from app.services.login_attempt_service import (
     count_failed_attempts,
     record_login_attempt,
 )
+from app.services.detection.result import DetectionResult
 
 
 async def test_successful_login_attempt_is_recorded(
@@ -168,12 +169,11 @@ async def test_login_attempt_is_rolled_back_when_alert_creation_fails(
     email = "alert-rollback@example.com"
 
     detection_result = [
-        {
-            "triggered": True,
-            "alert_type": "TEST_DETECTION",
-            "severity": "CRITICAL",
-            "message": "Synthetic detection for rollback testing",
-        }
+        DetectionResult.triggered_alert(
+            alert_type="TEST_DETECTION",
+            severity="CRITICAL",
+            message="Synthetic detection for rollback testing",
+        )
     ]
 
     with (
