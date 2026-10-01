@@ -21,22 +21,6 @@ async def create_event(
     has completed successfully.
     """
 
-    # Existing behaviour retained temporarily.
-    #
-    # We will revisit event deduplication separately because identical
-    # security events may represent distinct occurrences and should not
-    # necessarily be collapsed.
-    existing = await db.execute(
-        select(SecurityEvent).where(
-            SecurityEvent.event_type == event_data.event_type,
-            SecurityEvent.message == event_data.description,
-        )
-    )
-
-    duplicate = existing.scalar_one_or_none()
-
-    if duplicate:
-        return duplicate
 
     event = SecurityEvent(
         event_type=event_data.event_type,
@@ -45,6 +29,7 @@ async def create_event(
         message=event_data.description,
         user_id=event_data.user_id,
         event_metadata=event_data.event_metadata,
+        occurred_at=event_data.occurred_at,
     )
 
     db.add(event)

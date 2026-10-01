@@ -20,7 +20,7 @@ class SecurityEventCreate(BaseModel):
 
     event_metadata: dict | None = None
 
-
+    occurred_at: datetime | None = None 
 
 class SecurityEventResponse(BaseModel):
 
@@ -39,6 +39,8 @@ class SecurityEventResponse(BaseModel):
     event_metadata: dict[str, Any] | None
 
     created_at: datetime
+
+    occurred_at: datetime | None
 
 
     model_config = ConfigDict(from_attributes=True)
@@ -62,6 +64,8 @@ class SecurityEventListResponse(BaseModel):
     event_metadata: dict[str, Any] | None
 
     created_at: datetime
+
+    occurred_at: datetime | None
 
 
     model_config = ConfigDict(from_attributes=True)

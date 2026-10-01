@@ -70,6 +70,10 @@ class SecurityEvent(Base):
         nullable=True
     )
 
+    occurred_at = Column(
+        DateTime,
+        nullable=True
+    )
 
     created_at = Column(
         DateTime,

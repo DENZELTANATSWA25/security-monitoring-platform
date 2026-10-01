@@ -313,3 +313,70 @@ async def test_fifth_event_from_same_source_creates_event_burst_alert(
     assert alert.severity == "HIGH"
     assert alert.message is not None
     assert source in alert.message
+
+async def test_event_occurrence_time_is_persisted(
+    db_session: AsyncSession,
+) -> None:
+    """Source occurrence time should be preserved separately from ingestion time."""
+
+    from datetime import datetime
+
+    occurred_at = datetime(
+        2026,
+        10,
+        1,
+        18,
+        30,
+        0,
+    )
+
+    event_data = SecurityEventCreate(
+        event_type="EXTERNAL_TIMESTAMP_TEST",
+        severity=EventSeverity.WARNING,
+        source="linux-server-01",
+        description="External telemetry event.",
+        occurred_at=occurred_at,
+    )
+
+    event = await create_event(
+        db=db_session,
+        event_data=event_data,
+    )
+
+    assert event.occurred_at == occurred_at
+    assert event.created_at is not None
+
+async def test_identical_events_are_stored_as_distinct_occurrences(
+    db_session: AsyncSession,
+) -> None:
+    """Repeated telemetry must not be discarded based on message equality."""
+
+    event_data = SecurityEventCreate(
+        event_type="SSH_LOGIN_FAILURE",
+        severity=EventSeverity.WARNING,
+        source="linux-server-01",
+        description="Failed password for root",
+    )
+
+    first_event = await create_event(
+        db=db_session,
+        event_data=event_data,
+    )
+
+    second_event = await create_event(
+        db=db_session,
+        event_data=event_data,
+    )
+
+    assert first_event.id != second_event.id
+
+    result = await db_session.execute(
+        select(SecurityEvent).where(
+            SecurityEvent.event_type == "SSH_LOGIN_FAILURE",
+            SecurityEvent.source == "linux-server-01",
+        )
+    )
+
+    events = result.scalars().all()
+
+    assert len(events) == 2

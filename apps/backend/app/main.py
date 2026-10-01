@@ -11,7 +11,8 @@ from app.api.v1.endpoints import (
     analytics,
     websocket,
     incidents,
-    reports
+    reports,
+    ingestion,
 )
 
 from app.core.config import settings
@@ -70,6 +71,11 @@ app.include_router(
     reports.router,
     prefix="/api/v1"
 )
+app.include_router(
+    ingestion.router,
+    prefix="/api/v1",
+)
+
 
 @app.get("/")
 async def health_check():
