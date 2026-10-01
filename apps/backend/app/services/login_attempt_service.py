@@ -11,6 +11,8 @@ async def record_login_attempt(
     email: str,
     successful: bool,
     ip_address: str | None = None,
+    latitude: float | None = None,
+    longitude: float | None = None,
 ) -> LoginAttempt:
     """
     Record an authentication attempt and run detection when it fails.
@@ -23,6 +25,8 @@ async def record_login_attempt(
         email=email,
         successful=successful,
         ip_address=ip_address or "0.0.0.0",
+        latitude=latitude,
+        longitude=longitude,
     )
 
     db.add(attempt)
@@ -32,26 +36,25 @@ async def record_login_attempt(
         # engine without committing the transaction.
         await db.flush()
 
-        if not successful:
-            # Local imports avoid the circular dependency between the login-attempt and detection services.
+        # Every authentication attempt is evaluated by the detection engine.
+        # Individual rules decide whether the attempt applies to them.
+        from app.services.alert_service import create_alert
+        from app.services.detection.engine import run_detection
+    
+        detection = await run_detection(
+            db,
+            DetectionContext(
+                login_attempt=attempt,
+            ),
+        )
 
-            from app.services.alert_service import create_alert
-            from app.services.detection.engine import run_detection
-
-            detection = await run_detection(
-                db,
-                DetectionContext(
-                    login_attempt=attempt,
-                ),
+        for detection in detection:
+            await create_alert(
+                db=db,
+                alert_type=detection.alert_type,
+                severity=detection.severity,
+                message=detection.message,
             )
-
-            for detection in detection:
-                await create_alert(
-                    db=db,
-                    alert_type=detection.alert_type,
-                    severity=detection.severity,
-                    message=detection.message,
-                )
 
         await db.commit()
 

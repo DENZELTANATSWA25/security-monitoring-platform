@@ -23,6 +23,8 @@ from app.services.login_attempt_service import (
 from app.models.security_event import EventSeverity
 from app.schemas.security_event import SecurityEventCreate
 from app.services.event_service import create_event
+from app.services.location_service import resolve_ip_location
+from app.services.client_ip_service import get_client_ip
 
 router = APIRouter(
     prefix="/auth",
@@ -68,13 +70,17 @@ async def login(
     db: AsyncSession = Depends(get_db),
 ):
     try:
-        client_ip = request.client.host
+        client_ip = get_client_ip(request)
+
+        location = await resolve_ip_location(client_ip)
 
         return await login_user(
             db=db,
             email=user.email,
             password=user.password,
-            ip_address=client_ip
+            ip_address=client_ip,
+            latitude=location.latitude if location else None,
+            longitude=location.longitude if location else None,
         )
 
     except ValueError as e:

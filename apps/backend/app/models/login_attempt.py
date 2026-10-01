@@ -1,6 +1,13 @@
 from datetime import datetime
 
-from sqlalchemy import Column, Integer, String, Boolean, DateTime
+from sqlalchemy import (
+    Boolean,
+    Column,
+    DateTime,
+    Float,
+    Integer,
+    String,
+)
 
 from app.db.base import Base
 
@@ -26,6 +33,16 @@ class LoginAttempt(Base):
     ip_address = Column(
         String(50),
         nullable=False
+    )
+
+    latitude = Column(
+        Float,
+        nullable=True
+    )
+
+    longitude = Column(
+        Float,
+        nullable=True
     )
 
     timestamp = Column(

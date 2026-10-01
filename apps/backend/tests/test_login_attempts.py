@@ -6,6 +6,7 @@ import pytest
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from datetime import datetime, timedelta
 from app.models.alert import Alert
 from app.models.login_attempt import LoginAttempt
 from app.services.login_attempt_service import (
@@ -82,6 +83,34 @@ async def test_missing_ip_address_uses_default(
     )
 
     assert attempt.ip_address == "0.0.0.0"
+
+async def test_login_attempt_location_is_persisted(
+    db_session: AsyncSession,
+) -> None:
+    """Login-attempt coordinates should be persisted when supplied."""
+
+    attempt = await record_login_attempt(
+        db=db_session,
+        email="location@example.com",
+        successful=True,
+        ip_address="203.0.113.10",
+        latitude=51.5074,
+        longitude=-0.1278,
+    )
+
+    assert attempt.latitude == pytest.approx(51.5074)
+    assert attempt.longitude == pytest.approx(-0.1278)
+
+    result = await db_session.execute(
+        select(LoginAttempt).where(
+            LoginAttempt.id == attempt.id,
+        )
+    )
+
+    stored_attempt = result.scalar_one()
+
+    assert stored_attempt.latitude == pytest.approx(51.5074)
+    assert stored_attempt.longitude == pytest.approx(-0.1278)
 
 
 async def test_fifth_failed_attempt_creates_brute_force_alert(
@@ -210,20 +239,204 @@ async def test_login_attempt_is_rolled_back_when_alert_creation_fails(
     assert attempt_result.scalar_one() == 0
 
 
-async def test_successful_attempt_does_not_run_detection(
+async def test_successful_attempt_runs_detection(
     db_session: AsyncSession,
 ) -> None:
-    """Successful authentication should not invoke threat detection."""
+    """Successful authentication should be evaluated by detection rules."""
 
     with patch(
         "app.services.detection.engine.run_detection",
-        new=AsyncMock(),
+        new=AsyncMock(return_value=[]),
     ) as mocked_detection:
-        await record_login_attempt(
+        attempt = await record_login_attempt(
             db=db_session,
-            email="successful-no-detection@example.com",
+            email="successful-detection@example.com",
             successful=True,
             ip_address="192.0.2.50",
         )
 
-    mocked_detection.assert_not_awaited()
+    mocked_detection.assert_awaited_once()
+
+    _, context = mocked_detection.await_args.args
+
+    assert context.login_attempt is attempt
+
+
+async def test_first_successful_login_does_not_create_suspicious_login_alert(
+    db_session: AsyncSession,
+) -> None:
+    """An account's first successful login should establish its baseline."""
+
+    email = "first-login@example.com"
+
+    await record_login_attempt(
+        db=db_session,
+        email=email,
+        successful=True,
+        ip_address="192.0.2.100",
+    )
+
+    result = await db_session.execute(
+        select(Alert).where(
+            Alert.alert_type == "SUSPICIOUS_LOGIN",
+            Alert.message.contains(email),
+        )
+    )
+
+    assert result.scalar_one_or_none() is None
+
+
+async def test_known_successful_login_ip_does_not_create_alert(
+    db_session: AsyncSession,
+) -> None:
+    """Repeated successful logins from a known IP should not be suspicious."""
+
+    email = "known-ip@example.com"
+    ip_address = "192.0.2.110"
+
+    await record_login_attempt(
+        db=db_session,
+        email=email,
+        successful=True,
+        ip_address=ip_address,
+    )
+
+    await record_login_attempt(
+        db=db_session,
+        email=email,
+        successful=True,
+        ip_address=ip_address,
+    )
+
+    result = await db_session.execute(
+        select(Alert).where(
+            Alert.alert_type == "SUSPICIOUS_LOGIN",
+            Alert.message.contains(email),
+        )
+    )
+
+    assert result.scalar_one_or_none() is None
+
+
+async def test_new_successful_login_ip_creates_suspicious_login_alert(
+    db_session: AsyncSession,
+) -> None:
+    """A new IP after established successful-login history should alert."""
+
+    email = "new-ip@example.com"
+
+    await record_login_attempt(
+        db=db_session,
+        email=email,
+        successful=True,
+        ip_address="192.0.2.120",
+    )
+
+    await record_login_attempt(
+        db=db_session,
+        email=email,
+        successful=True,
+        ip_address="203.0.113.120",
+    )
+
+    result = await db_session.execute(
+        select(Alert).where(
+            Alert.alert_type == "SUSPICIOUS_LOGIN",
+            Alert.message.contains(email),
+        )
+    )
+
+    alert = result.scalar_one_or_none()
+
+    assert alert is not None
+    assert alert.severity == "MEDIUM"
+    assert "203.0.113.120" in alert.message
+
+
+async def test_successful_ip_history_is_isolated_by_account(
+    db_session: AsyncSession,
+) -> None:
+    """Another account's IP history must not establish trust for this account."""
+
+    shared_ip = "192.0.2.130"
+
+    await record_login_attempt(
+        db=db_session,
+        email="other-account@example.com",
+        successful=True,
+        ip_address=shared_ip,
+    )
+
+    await record_login_attempt(
+        db=db_session,
+        email="target-account@example.com",
+        successful=True,
+        ip_address="192.0.2.131",
+    )
+
+    await record_login_attempt(
+        db=db_session,
+        email="target-account@example.com",
+        successful=True,
+        ip_address=shared_ip,
+    )
+
+    result = await db_session.execute(
+        select(Alert).where(
+            Alert.alert_type == "SUSPICIOUS_LOGIN",
+            Alert.message.contains("target-account@example.com"),
+        )
+    )
+
+    alert = result.scalar_one_or_none()
+
+    assert alert is not None
+    assert shared_ip in alert.message
+
+async def test_impossible_travel_creates_alert(
+    db_session: AsyncSession,
+) -> None:
+    """
+    Geographically impossible successful logins should create an alert
+    through the real login-attempt detection workflow.
+    """
+
+    email = "impossible-travel@example.com"
+
+    first_attempt = await record_login_attempt(
+        db=db_session,
+        email=email,
+        successful=True,
+        ip_address="192.0.2.220",
+        latitude=51.5074,
+        longitude=-0.1278,
+    )
+
+    # Move the first login into the past so the second login represents
+    # London -> New York within thirty minutes.
+    first_attempt.timestamp = datetime.utcnow() - timedelta(
+        minutes=30,
+    )
+
+    await db_session.commit()
+
+    await record_login_attempt(
+        db=db_session,
+        email=email,
+        successful=True,
+        ip_address="203.0.113.220",
+        latitude=40.7128,
+        longitude=-74.0060,
+    )
+
+    result = await db_session.execute(
+        select(Alert).where(
+            Alert.alert_type == "IMPOSSIBLE_TRAVEL",
+        )
+    )
+
+    alerts = result.scalars().all()
+
+    assert len(alerts) == 1
+    assert alerts[0].severity == "HIGH"
+    assert email in alerts[0].message

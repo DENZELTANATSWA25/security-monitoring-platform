@@ -46,6 +46,7 @@ services:
 
     volumes:
       - ./apps/backend:/app
+      - ./data/geoip:/data/geoip:ro
 
     restart: always
 

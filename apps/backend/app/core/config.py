@@ -13,6 +13,8 @@ class Settings(BaseSettings):
     JWT_SECRET_KEY: str
     JWT_ALGORITHM: str = "HS256"
     JWT_EXPIRE_MINUTES: int = 60
+    GEOIP_DATABASE_PATH: str | None = None
+    TRUSTED_PROXY_IPS: str = ""
 
     # Pydantic Settings v2 configuration.
     model_config = SettingsConfigDict(

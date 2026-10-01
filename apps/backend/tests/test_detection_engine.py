@@ -18,6 +18,11 @@ from app.services.detection.event_burst_rule import EventBurstRule
 
 from app.models.login_attempt import LoginAttempt
 from app.services.detection.base import DetectionContext
+from app.services.detection.suspicious_login_rule import SuspiciousLoginRule
+from app.services.detection.geo import haversine_distance_km
+from app.services.detection.impossible_travel_rule import (
+    ImpossibleTravelRule,
+)
 
 
 def test_not_triggered_result_has_no_alert_data() -> None:
@@ -53,6 +58,34 @@ def test_detection_result_is_immutable() -> None:
 
     with pytest.raises(FrozenInstanceError):
         result.triggered = True
+
+def test_haversine_distance_is_zero_for_same_location() -> None:
+    """Identical coordinates should have zero geographic distance."""
+
+    distance = haversine_distance_km(
+        51.5074,
+        -0.1278,
+        51.5074,
+        -0.1278,
+    )
+
+    assert distance == pytest.approx(0.0)
+
+
+def test_haversine_distance_between_london_and_new_york() -> None:
+    """London and New York should be roughly 5,570 km apart."""
+
+    distance = haversine_distance_km(
+        51.5074,
+        -0.1278,
+        40.7128,
+        -74.0060,
+    )
+
+    assert distance == pytest.approx(
+        5570,
+        abs=20,
+    )
 
 
 async def test_engine_ignores_non_triggered_rules(
@@ -473,3 +506,402 @@ async def test_brute_force_rule_ignores_successful_login(
 
     assert result == DetectionResult.not_triggered()
     count_mock.assert_not_awaited()
+
+async def test_suspicious_login_rule_ignores_missing_login_attempt(
+    db_session: AsyncSession,
+) -> None:
+    """Suspicious-login detection requires a login attempt."""
+
+    result = await SuspiciousLoginRule().evaluate(
+        db_session,
+        DetectionContext(),
+    )
+
+    assert result == DetectionResult.not_triggered()
+
+
+async def test_suspicious_login_rule_ignores_failed_login(
+    db_session: AsyncSession,
+) -> None:
+    """Failed logins should not be evaluated as suspicious successful logins."""
+
+    attempt = LoginAttempt(
+        email="failed-suspicious@example.com",
+        successful=False,
+        ip_address="192.0.2.200",
+    )
+
+    db_session.add(attempt)
+    await db_session.flush()
+
+    result = await SuspiciousLoginRule().evaluate(
+        db_session,
+        DetectionContext(
+            login_attempt=attempt,
+        ),
+    )
+
+    assert result == DetectionResult.not_triggered()
+
+
+async def test_suspicious_login_rule_first_success_establishes_baseline(
+    db_session: AsyncSession,
+) -> None:
+    """The first successful login should establish IP history without alerting."""
+
+    attempt = LoginAttempt(
+        email="first-success@example.com",
+        successful=True,
+        ip_address="192.0.2.201",
+    )
+
+    db_session.add(attempt)
+    await db_session.flush()
+
+    result = await SuspiciousLoginRule().evaluate(
+        db_session,
+        DetectionContext(
+            login_attempt=attempt,
+        ),
+    )
+
+    assert result == DetectionResult.not_triggered()
+
+
+async def test_suspicious_login_rule_ignores_known_ip(
+    db_session: AsyncSession,
+) -> None:
+    """A successful login from previously observed IP history should not alert."""
+
+    email = "known-rule-ip@example.com"
+    ip_address = "192.0.2.202"
+
+    previous_attempt = LoginAttempt(
+        email=email,
+        successful=True,
+        ip_address=ip_address,
+    )
+
+    db_session.add(previous_attempt)
+    await db_session.flush()
+
+    current_attempt = LoginAttempt(
+        email=email,
+        successful=True,
+        ip_address=ip_address,
+    )
+
+    db_session.add(current_attempt)
+    await db_session.flush()
+
+    result = await SuspiciousLoginRule().evaluate(
+        db_session,
+        DetectionContext(
+            login_attempt=current_attempt,
+        ),
+    )
+
+    assert result == DetectionResult.not_triggered()
+
+
+async def test_suspicious_login_rule_triggers_for_new_ip(
+    db_session: AsyncSession,
+) -> None:
+    """A successful login from an unseen IP should trigger after history exists."""
+
+    email = "new-rule-ip@example.com"
+
+    previous_attempt = LoginAttempt(
+        email=email,
+        successful=True,
+        ip_address="192.0.2.203",
+    )
+
+    db_session.add(previous_attempt)
+    await db_session.flush()
+
+    current_attempt = LoginAttempt(
+        email=email,
+        successful=True,
+        ip_address="203.0.113.203",
+    )
+
+    db_session.add(current_attempt)
+    await db_session.flush()
+
+    result = await SuspiciousLoginRule().evaluate(
+        db_session,
+        DetectionContext(
+            login_attempt=current_attempt,
+        ),
+    )
+
+    assert result.triggered is True
+    assert result.alert_type == "SUSPICIOUS_LOGIN"
+    assert result.severity == "MEDIUM"
+    assert result.message is not None
+    assert email in result.message
+    assert current_attempt.ip_address in result.message
+
+
+async def test_impossible_travel_rule_ignores_missing_login_attempt(
+    db_session: AsyncSession,
+) -> None:
+    """Impossible-travel detection requires a login attempt."""
+
+    result = await ImpossibleTravelRule().evaluate(
+        db_session,
+        DetectionContext(),
+    )
+
+    assert result == DetectionResult.not_triggered()
+
+
+async def test_impossible_travel_rule_ignores_failed_login(
+    db_session: AsyncSession,
+) -> None:
+    """Failed authentication attempts should not run travel detection."""
+
+    attempt = LoginAttempt(
+        email="travel-failed@example.com",
+        successful=False,
+        ip_address="192.0.2.200",
+        latitude=51.5074,
+        longitude=-0.1278,
+        timestamp=datetime.utcnow(),
+    )
+
+    db_session.add(attempt)
+    await db_session.flush()
+
+    result = await ImpossibleTravelRule().evaluate(
+        db_session,
+        DetectionContext(
+            login_attempt=attempt,
+        ),
+    )
+
+    assert result == DetectionResult.not_triggered()
+
+
+async def test_impossible_travel_rule_ignores_missing_location(
+    db_session: AsyncSession,
+) -> None:
+    """A successful login without coordinates cannot be compared geographically."""
+
+    attempt = LoginAttempt(
+        email="travel-no-location@example.com",
+        successful=True,
+        ip_address="192.0.2.201",
+        latitude=None,
+        longitude=None,
+        timestamp=datetime.utcnow(),
+    )
+
+    db_session.add(attempt)
+    await db_session.flush()
+
+    result = await ImpossibleTravelRule().evaluate(
+        db_session,
+        DetectionContext(
+            login_attempt=attempt,
+        ),
+    )
+
+    assert result == DetectionResult.not_triggered()
+
+
+async def test_impossible_travel_rule_first_location_establishes_baseline(
+    db_session: AsyncSession,
+) -> None:
+    """The first geolocated successful login should establish a baseline."""
+
+    attempt = LoginAttempt(
+        email="travel-baseline@example.com",
+        successful=True,
+        ip_address="192.0.2.202",
+        latitude=51.5074,
+        longitude=-0.1278,
+        timestamp=datetime.utcnow(),
+    )
+
+    db_session.add(attempt)
+    await db_session.flush()
+
+    result = await ImpossibleTravelRule().evaluate(
+        db_session,
+        DetectionContext(
+            login_attempt=attempt,
+        ),
+    )
+
+    assert result == DetectionResult.not_triggered()
+
+
+async def test_impossible_travel_rule_allows_realistic_travel(
+    db_session: AsyncSession,
+) -> None:
+    """A long-distance login after enough travel time should not trigger."""
+
+    email = "travel-realistic@example.com"
+    current_time = datetime.utcnow()
+
+    previous_attempt = LoginAttempt(
+        email=email,
+        successful=True,
+        ip_address="192.0.2.203",
+        latitude=51.5074,
+        longitude=-0.1278,
+        timestamp=current_time - timedelta(hours=10),
+    )
+
+    current_attempt = LoginAttempt(
+        email=email,
+        successful=True,
+        ip_address="203.0.113.203",
+        latitude=40.7128,
+        longitude=-74.0060,
+        timestamp=current_time,
+    )
+
+    db_session.add_all([
+        previous_attempt,
+        current_attempt,
+    ])
+    await db_session.flush()
+
+    result = await ImpossibleTravelRule().evaluate(
+        db_session,
+        DetectionContext(
+            login_attempt=current_attempt,
+        ),
+    )
+
+    assert result == DetectionResult.not_triggered()
+
+
+async def test_impossible_travel_rule_triggers_for_unrealistic_travel(
+    db_session: AsyncSession,
+) -> None:
+    """London to New York in one hour should trigger impossible travel."""
+
+    email = "travel-impossible@example.com"
+    current_time = datetime.utcnow()
+
+    previous_attempt = LoginAttempt(
+        email=email,
+        successful=True,
+        ip_address="192.0.2.204",
+        latitude=51.5074,
+        longitude=-0.1278,
+        timestamp=current_time - timedelta(hours=1),
+    )
+
+    current_attempt = LoginAttempt(
+        email=email,
+        successful=True,
+        ip_address="203.0.113.204",
+        latitude=40.7128,
+        longitude=-74.0060,
+        timestamp=current_time,
+    )
+
+    db_session.add_all([
+        previous_attempt,
+        current_attempt,
+    ])
+    await db_session.flush()
+
+    result = await ImpossibleTravelRule().evaluate(
+        db_session,
+        DetectionContext(
+            login_attempt=current_attempt,
+        ),
+    )
+
+    assert result.triggered is True
+    assert result.alert_type == "IMPOSSIBLE_TRAVEL"
+    assert result.severity == "HIGH"
+    assert result.message is not None
+    assert email in result.message
+
+async def test_impossible_travel_rule_allows_nearby_locations(
+    db_session: AsyncSession,
+) -> None:
+    """Nearby successful logins should not be classified as impossible travel."""
+
+    email = "travel-nearby@example.com"
+    current_time = datetime.utcnow()
+
+    previous_attempt = LoginAttempt(
+        email=email,
+        successful=True,
+        ip_address="192.0.2.210",
+        latitude=51.5074,
+        longitude=-0.1278,
+        timestamp=current_time - timedelta(minutes=10),
+    )
+
+    current_attempt = LoginAttempt(
+        email=email,
+        successful=True,
+        ip_address="203.0.113.210",
+        latitude=51.5155,
+        longitude=-0.0922,
+        timestamp=current_time,
+    )
+
+    db_session.add_all([
+        previous_attempt,
+        current_attempt,
+    ])
+    await db_session.flush()
+
+    result = await ImpossibleTravelRule().evaluate(
+        db_session,
+        DetectionContext(
+            login_attempt=current_attempt,
+        ),
+    )
+
+    assert result == DetectionResult.not_triggered()
+
+async def test_impossible_travel_history_is_isolated_by_account(
+    db_session: AsyncSession,
+) -> None:
+    """Another account's location history must not affect this account."""
+
+    current_time = datetime.utcnow()
+
+    other_account_attempt = LoginAttempt(
+        email="other-traveller@example.com",
+        successful=True,
+        ip_address="192.0.2.211",
+        latitude=51.5074,
+        longitude=-0.1278,
+        timestamp=current_time - timedelta(minutes=30),
+    )
+
+    target_attempt = LoginAttempt(
+        email="target-traveller@example.com",
+        successful=True,
+        ip_address="203.0.113.211",
+        latitude=40.7128,
+        longitude=-74.0060,
+        timestamp=current_time,
+    )
+
+    db_session.add_all([
+        other_account_attempt,
+        target_attempt,
+    ])
+    await db_session.flush()
+
+    result = await ImpossibleTravelRule().evaluate(
+        db_session,
+        DetectionContext(
+            login_attempt=target_attempt,
+        ),
+    )
+
+    assert result == DetectionResult.not_triggered()

@@ -40,7 +40,9 @@ async def login_user(
     db: AsyncSession,
     email: str,
     password: str,
-    ip_address: str | None = None
+    ip_address: str | None = None,
+    latitude: float | None = None,
+    longitude: float | None = None,
 ):
 
     user = await authenticate_user(
@@ -56,7 +58,9 @@ async def login_user(
             db=db,
             email=email,
             successful=False,
-            ip_address=ip_address
+            ip_address=ip_address,
+            latitude=latitude,
+            longitude=longitude,
         )
 
         raise ValueError(
@@ -68,7 +72,9 @@ async def login_user(
         db=db,
         email=email,
         successful=True,
-        ip_address=ip_address
+        ip_address=ip_address,
+        latitude=latitude,
+        longitude=longitude,
     )
 
     await log_event(
