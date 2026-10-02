@@ -103,3 +103,46 @@ async def mark_telemetry_source_seen(
     source.last_seen_at = datetime.utcnow()
 
     await db.flush()
+
+
+async def get_telemetry_source_by_id(
+    db: AsyncSession,
+    source_id: int,
+) -> TelemetrySource | None:
+    """Return a telemetry source by its database identifier."""
+
+    result = await db.execute(
+        select(TelemetrySource).where(
+            TelemetrySource.id == source_id,
+        )
+    )
+
+    return result.scalar_one_or_none()
+
+
+async def get_all_telemetry_sources(
+    db: AsyncSession,
+) -> list[TelemetrySource]:
+    """Return all registered telemetry sources."""
+
+    result = await db.execute(
+        select(TelemetrySource).order_by(
+            TelemetrySource.created_at.desc(),
+        )
+    )
+
+    return list(result.scalars().all())
+
+
+async def revoke_telemetry_source(
+    db: AsyncSession,
+    source: TelemetrySource,
+) -> TelemetrySource:
+    """Revoke a telemetry source so its credential can no longer authenticate."""
+
+    source.is_active = False
+
+    await db.flush()
+    await db.refresh(source)
+
+    return source

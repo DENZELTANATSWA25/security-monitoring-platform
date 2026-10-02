@@ -85,6 +85,8 @@ async def login_user(
         details=f"{user.email} logged in",
     )
 
+    await db.commit()
+
     access_token = create_access_token(
         data={
             "sub": str(user.id),

@@ -51,6 +51,8 @@ async def register_user(
             details=f"{new_user.email} registered",
         )
 
+        await db.commit()
+
         return new_user
 
     except ValueError as e:

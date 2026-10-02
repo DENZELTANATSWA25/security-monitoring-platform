@@ -13,6 +13,7 @@ from app.api.v1.endpoints import (
     incidents,
     reports,
     ingestion,
+    telemetry_sources,
 )
 
 from app.core.config import settings
@@ -75,7 +76,10 @@ app.include_router(
     ingestion.router,
     prefix="/api/v1",
 )
-
+app.include_router(
+    telemetry_sources.router,
+    prefix="/api/v1",
+)
 
 @app.get("/")
 async def health_check():
