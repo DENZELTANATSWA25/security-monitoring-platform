@@ -3,9 +3,14 @@
 from datetime import datetime
 
 from sqlalchemy import Boolean, DateTime, String
-from sqlalchemy.orm import Mapped, mapped_column
+from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.db.base import Base
+
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from app.models.security_event import SecurityEvent
 
 class TelemetrySource(Base):
     """
@@ -18,6 +23,11 @@ class TelemetrySource(Base):
 
     id: Mapped[int] = mapped_column(
         primary_key=True,
+    )
+
+    security_events: Mapped[list["SecurityEvent"]] = relationship(
+        "SecurityEvent",
+        back_populates="telemetry_source",
     )
 
     name: Mapped[str] = mapped_column(

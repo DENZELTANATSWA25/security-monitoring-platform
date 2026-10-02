@@ -28,6 +28,7 @@ async def create_event(
         source=event_data.source,
         message=event_data.description,
         user_id=event_data.user_id,
+        telemetry_source_id=event_data.telemetry_source_id,
         event_metadata=event_data.event_metadata,
         occurred_at=event_data.occurred_at,
     )

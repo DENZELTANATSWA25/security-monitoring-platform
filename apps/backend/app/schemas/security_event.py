@@ -22,6 +22,8 @@ class SecurityEventCreate(BaseModel):
 
     occurred_at: datetime | None = None 
 
+    telemetry_source_id: int | None = None
+
 class SecurityEventResponse(BaseModel):
 
     id: int
@@ -41,6 +43,8 @@ class SecurityEventResponse(BaseModel):
     created_at: datetime
 
     occurred_at: datetime | None
+
+    telemetry_source_id: int | None
 
 
     model_config = ConfigDict(from_attributes=True)
@@ -66,6 +70,8 @@ class SecurityEventListResponse(BaseModel):
     created_at: datetime
 
     occurred_at: datetime | None
+
+    telemetry_source_id: int | None
 
 
     model_config = ConfigDict(from_attributes=True)

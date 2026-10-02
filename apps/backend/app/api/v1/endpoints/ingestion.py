@@ -38,4 +38,5 @@ async def ingest_event(
     return await ingest_telemetry_event(
         db=db,
         telemetry=telemetry,
+        telemetry_source=telemetry_source,
     )

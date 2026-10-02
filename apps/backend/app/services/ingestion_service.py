@@ -6,10 +6,12 @@ from app.models.security_event import SecurityEvent
 from app.schemas.ingestion import TelemetryEventCreate
 from app.schemas.security_event import SecurityEventCreate
 from app.services.event_service import create_event
+from app.models.telemetry_source import TelemetrySource
 
 async def ingest_telemetry_event(
         db: AsyncSession,
         telemetry: TelemetryEventCreate,
+        telemetry_source: TelemetrySource,
 ) -> SecurityEvent:
     # Normalise external telemetry and pass it into the canonical event processing pipeline.
 
@@ -19,6 +21,7 @@ async def ingest_telemetry_event(
         source=telemetry.source,
         description=telemetry.description,
         user_id=None,
+        telemetry_source_id=telemetry_source.id,
         event_metadata=telemetry.event_metadata,
         occurred_at=telemetry.occurred_at,
     )

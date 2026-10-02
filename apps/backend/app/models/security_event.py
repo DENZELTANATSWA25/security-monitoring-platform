@@ -1,4 +1,5 @@
 from datetime import datetime
+import enum
 
 from sqlalchemy import (
     Column,
@@ -7,25 +8,20 @@ from sqlalchemy import (
     Text,
     DateTime,
     Enum,
-    JSON
+    JSON,
+    ForeignKey,
 )
+from sqlalchemy.orm import relationship
 
 from app.db.base import Base
 
-import enum
-
 
 class EventSeverity(str, enum.Enum):
-
     INFO = "INFO"
     WARNING = "WARNING"
     ERROR = "ERROR"
     CRITICAL = "CRITICAL"
-
-
-
 class SecurityEvent(Base):
-
     __tablename__ = "security_events"
 
 
@@ -39,7 +35,6 @@ class SecurityEvent(Base):
         String(100),
         nullable=False
     )
-
 
     severity = Column(
         Enum(EventSeverity),
@@ -63,6 +58,21 @@ class SecurityEvent(Base):
     user_id = Column(
         Integer,
         nullable=True
+    )
+
+    telemetry_source_id = Column(
+        Integer,
+        ForeignKey(
+            "telemetry_sources.id",
+            ondelete="SET NULL",
+        ),
+        nullable=True,
+        index=True,
+    )
+
+    telemetry_source = relationship(
+        "TelemetrySource",
+        back_populates="security_events",
     )
     
     event_metadata = Column(
