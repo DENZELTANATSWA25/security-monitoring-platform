@@ -6,24 +6,14 @@ from httpx import AsyncClient
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.core.config import settings
 from app.models.security_event import SecurityEvent
-
-
-TEST_INGESTION_KEY = "test-ingestion-key"
+from app.services.telemetry_source_service import create_telemetry_source
 
 
 async def test_ingestion_requires_credentials(
     client: AsyncClient,
-    monkeypatch,
 ) -> None:
     """External telemetry must not be accepted anonymously."""
-
-    monkeypatch.setattr(
-        settings,
-        "INGESTION_API_KEY",
-        TEST_INGESTION_KEY,
-    )
 
     response = await client.post(
         "/api/v1/ingestion/events",
@@ -40,15 +30,8 @@ async def test_ingestion_requires_credentials(
 
 async def test_ingestion_rejects_invalid_credentials(
     client: AsyncClient,
-    monkeypatch,
 ) -> None:
-    """An incorrect ingestion key must be rejected."""
-
-    monkeypatch.setattr(
-        settings,
-        "INGESTION_API_KEY",
-        TEST_INGESTION_KEY,
-    )
+    """Malformed telemetry credentials must be rejected."""
 
     response = await client.post(
         "/api/v1/ingestion/events",
@@ -66,22 +49,25 @@ async def test_ingestion_rejects_invalid_credentials(
     assert response.status_code == 401
 
 
-async def test_ingestion_fails_closed_when_not_configured(
+async def test_ingestion_rejects_revoked_source(
     client: AsyncClient,
-    monkeypatch,
+    db_session: AsyncSession,
 ) -> None:
-    """An unset server key must disable external ingestion."""
+    """A revoked telemetry source must not be allowed to ingest events."""
 
-    monkeypatch.setattr(
-        settings,
-        "INGESTION_API_KEY",
-        "",
+    source, credential = await create_telemetry_source(
+        db=db_session,
+        name="Revoked Ingestion Source",
+        source_type="test-agent",
     )
+
+    source.is_active = False
+    await db_session.flush()
 
     response = await client.post(
         "/api/v1/ingestion/events",
         headers={
-            "X-Ingestion-Key": TEST_INGESTION_KEY,
+            "X-Ingestion-Key": credential.credential,
         },
         json={
             "event_type": "SSH_LOGIN_FAILURE",
@@ -91,20 +77,19 @@ async def test_ingestion_fails_closed_when_not_configured(
         },
     )
 
-    assert response.status_code == 503
+    assert response.status_code == 401
 
 
 async def test_authenticated_external_event_is_ingested(
     client: AsyncClient,
     db_session: AsyncSession,
-    monkeypatch,
 ) -> None:
-    """Authenticated external telemetry should enter the event pipeline."""
+    """A registered telemetry source should enter the event pipeline."""
 
-    monkeypatch.setattr(
-        settings,
-        "INGESTION_API_KEY",
-        TEST_INGESTION_KEY,
+    source, credential = await create_telemetry_source(
+        db=db_session,
+        name="Linux Test Agent",
+        source_type="linux-agent",
     )
 
     occurred_at = "2026-10-01T18:30:00"
@@ -112,7 +97,7 @@ async def test_authenticated_external_event_is_ingested(
     response = await client.post(
         "/api/v1/ingestion/events",
         headers={
-            "X-Ingestion-Key": TEST_INGESTION_KEY,
+            "X-Ingestion-Key": credential.credential,
         },
         json={
             "event_type": "SSH_LOGIN_FAILURE",
@@ -155,3 +140,7 @@ async def test_authenticated_external_event_is_ingested(
         "source_ip": "203.0.113.50",
         "hostname": "linux-server-01",
     }
+
+    await db_session.refresh(source)
+
+    assert source.last_seen_at is not None

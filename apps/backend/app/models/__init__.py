@@ -10,6 +10,7 @@ from app.models.incident_event_link import IncidentEventLink
 from app.models.incident_alert_link import IncidentAlertLink
 from app.models.incident_evidence import IncidentEvidence
 from app.models.incident_resolution import IncidentResolution
+from app.models.telemetry_source import TelemetrySource
 
 __all__ = [
     "User",
@@ -24,4 +25,5 @@ __all__ = [
     "IncidentAlertLink",
     "IncidentEvidence",
     "IncidentResolution",
+    "TelemetrySource",
 ]

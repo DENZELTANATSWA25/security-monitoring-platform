@@ -17,7 +17,6 @@ class Settings(BaseSettings):
     TRUSTED_PROXY_IPS: str = ""
 
     # Machine-to-machine authentication for external telemetry ingestion.
-    INGESTION_API_KEY: str = ""
     INGESTION_API_KEY_HEADER: str = "X-Ingestion-Key"
 
     # Pydantic Settings v2 configuration.
