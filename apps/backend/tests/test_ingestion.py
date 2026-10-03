@@ -1,6 +1,6 @@
 """Tests for authenticated external telemetry ingestion."""
 
-from datetime import datetime
+from datetime import datetime, timedelta
 
 from httpx import AsyncClient
 from sqlalchemy import select
@@ -200,3 +200,92 @@ async def test_external_ingestion_runs_detection_and_creates_alert(
     assert alert.severity == "HIGH"
     assert alert.message is not None
     assert event_source in alert.message
+
+
+async def test_ingestion_rejects_blank_required_text(
+    client: AsyncClient,
+    db_session: AsyncSession,
+) -> None:
+    """Required telemetry text must contain meaningful content."""
+
+    _, credential = await create_telemetry_source(
+        db=db_session,
+        name="Blank Validation Test Agent",
+        source_type="test-agent",
+    )
+
+    response = await client.post(
+        "/api/v1/ingestion/events",
+        headers={
+            "X-Ingestion-Key": credential.credential,
+        },
+        json={
+            "event_type": "   ",
+            "severity": "WARNING",
+            "source": "linux-server-01",
+            "description": "Test event",
+        },
+    )
+
+    assert response.status_code == 422
+
+
+async def test_ingestion_rejects_oversized_description(
+    client: AsyncClient,
+    db_session: AsyncSession,
+) -> None:
+    """Telemetry descriptions must respect the ingestion size boundary."""
+
+    _, credential = await create_telemetry_source(
+        db=db_session,
+        name="Description Validation Test Agent",
+        source_type="test-agent",
+    )
+
+    response = await client.post(
+        "/api/v1/ingestion/events",
+        headers={
+            "X-Ingestion-Key": credential.credential,
+        },
+        json={
+            "event_type": "OVERSIZED_DESCRIPTION",
+            "severity": "WARNING",
+            "source": "linux-server-01",
+            "description": "x" * 10_001,
+        },
+    )
+
+    assert response.status_code == 422
+
+
+async def test_ingestion_rejects_event_too_far_in_future(
+    client: AsyncClient,
+    db_session: AsyncSession,
+) -> None:
+    """Telemetry timestamps implausibly far in the future must be rejected."""
+
+    _, credential = await create_telemetry_source(
+        db=db_session,
+        name="Timestamp Validation Test Agent",
+        source_type="test-agent",
+    )
+
+    future_time = datetime.utcnow() + timedelta(
+        minutes=10,
+    )
+
+    response = await client.post(
+        "/api/v1/ingestion/events",
+        headers={
+            "X-Ingestion-Key": credential.credential,
+        },
+        json={
+            "event_type": "FUTURE_EVENT",
+            "severity": "WARNING",
+            "source": "linux-server-01",
+            "description": "Event with invalid future timestamp.",
+            "occurred_at": future_time.isoformat(),
+        },
+    )
+
+    assert response.status_code == 422
