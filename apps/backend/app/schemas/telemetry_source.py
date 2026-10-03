@@ -67,3 +67,14 @@ class TelemetrySourceStatusResponse(BaseModel):
     last_seen_at: datetime | None
     events_24h: int
     last_event_at: datetime | None
+
+class TelemetrySourceCredentialRotatedResponse(
+    TelemetrySourceResponse
+):
+    """
+    Response returned after rotating a telemetry source credential.
+
+    The replacement credential is exposed only once. Only its key identifier and secret hash remain persisted afterwards.
+    """
+
+    credential: str

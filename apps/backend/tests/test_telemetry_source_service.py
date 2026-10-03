@@ -8,6 +8,7 @@ from app.services.telemetry_source_service import (
     authenticate_telemetry_source,
     create_telemetry_source,
     mark_telemetry_source_seen,
+    rotate_telemetry_source_credential,
 )
 
 
@@ -130,3 +131,47 @@ async def test_mark_source_seen_updates_timestamp(
     )
 
     assert source.last_seen_at is not None
+
+async def test_rotate_telemetry_source_credential_replaces_credentials(
+    db_session: AsyncSession,
+) -> None:
+    """Rotation must invalidate the old credential and issue a new one."""
+
+    source, old_credential = await create_telemetry_source(
+        db=db_session,
+        name="Credential Rotation Source",
+        source_type="test-agent",
+    )
+
+    await db_session.commit()
+
+    old_key_id = source.key_id
+    old_hash = source.api_key_hash
+
+    source, new_credential = await rotate_telemetry_source_credential(
+        db=db_session,
+        source=source,
+    )
+
+    await db_session.commit()
+
+    assert source.key_id != old_key_id
+    assert source.api_key_hash != old_hash
+
+    assert source.key_id == new_credential.key_id
+    assert source.api_key_hash != new_credential.secret
+    assert new_credential.secret not in source.api_key_hash
+
+    old_authentication = await authenticate_telemetry_source(
+        db=db_session,
+        credential=old_credential.credential,
+    )
+
+    new_authentication = await authenticate_telemetry_source(
+        db=db_session,
+        credential=new_credential.credential,
+    )
+
+    assert old_authentication is None
+    assert new_authentication is not None
+    assert new_authentication.id == source.id

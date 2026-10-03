@@ -154,6 +154,29 @@ async def revoke_telemetry_source(
 
     return source
 
+async def rotate_telemetry_source_credential(
+    db: AsyncSession,
+    source: TelemetrySource,
+) -> tuple[TelemetrySource, TelemetryCredential]:
+    """
+    Replace a telemetry source's credential.
+
+    A completely new key identifier and secret are generated.
+    Only the new secret hash is persisted, causing the previous credential to become invalid immediately after the transaction is committed.
+    """
+
+    credential = generate_telemetry_credential()
+
+    source.key_id = credential.key_id
+    source.api_key_hash = hash_telemetry_secret(
+        credential.secret,
+    )
+
+    await db.flush()
+    await db.refresh(source)
+
+    return source, credential
+
 
 async def get_telemetry_source_statuses(
     db: AsyncSession,

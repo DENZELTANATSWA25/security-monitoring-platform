@@ -12,6 +12,7 @@ from app.schemas.telemetry_source import (
     TelemetrySourceCreatedResponse,
     TelemetrySourceResponse,
     TelemetrySourceStatusResponse,
+    TelemetrySourceCredentialRotatedResponse,
 )
 from app.services.telemetry_source_service import (
     create_telemetry_source,
@@ -19,6 +20,7 @@ from app.services.telemetry_source_service import (
     get_telemetry_source_by_id,
     get_telemetry_source_statuses,
     revoke_telemetry_source,
+    rotate_telemetry_source_credential,
 )
 from app.services.audit_service import log_event
 
@@ -122,6 +124,74 @@ async def telemetry_source_status(
     """Return operational health information for telemetry sources."""
 
     return await get_telemetry_source_statuses(db)
+
+
+@router.post(
+    "/{source_id}/rotate-credential",
+    response_model=TelemetrySourceCredentialRotatedResponse,
+)
+async def rotate_source_credential(
+    source_id: int,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(
+        require_role(UserRole.ADMIN),
+    ),
+):
+    """Rotate a telemetry producer credential and return it once."""
+
+    source = await get_telemetry_source_by_id(
+        db=db,
+        source_id=source_id,
+    )
+
+    if source is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Telemetry source not found",
+        )
+
+    if not source.is_active:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="Cannot rotate credentials for a revoked telemetry source",
+        )
+
+    try:
+        source, credential = await rotate_telemetry_source_credential(
+            db=db,
+            source=source,
+        )
+
+        await log_event(
+            db=db,
+            action="TELEMETRY_SOURCE_CREDENTIAL_ROTATED",
+            resource="TELEMETRY_SOURCE",
+            user_id=current_user.id,
+            details=(
+                f"Rotated credential for telemetry source "
+                f"'{source.name}' (id={source.id})"
+            ),
+        )
+
+        # Rotation and its audit record become permanent together.
+        await db.commit()
+        await db.refresh(source)
+
+    except Exception:
+        await db.rollback()
+        raise
+
+    return TelemetrySourceCredentialRotatedResponse(
+        id=source.id,
+        name=source.name,
+        source_type=source.source_type,
+        key_id=source.key_id,
+        is_active=source.is_active,
+        last_seen_at=source.last_seen_at,
+        created_at=source.created_at,
+        updated_at=source.updated_at,
+        credential=credential.credential,
+    )
 
 
 @router.get(
