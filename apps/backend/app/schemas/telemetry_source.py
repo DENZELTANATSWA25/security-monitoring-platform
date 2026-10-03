@@ -1,6 +1,7 @@
 """Schemas for managing registered telemetry sources."""
 
 from datetime import datetime
+from enum import Enum
 
 from pydantic import BaseModel, ConfigDict, Field
 
@@ -46,3 +47,23 @@ class TelemetrySourceCreatedResponse(TelemetrySourceResponse):
     """
 
     credential: str
+
+class TelemetrySourceHealthStatus(str, Enum):
+    """Operational state derived from source activity."""
+
+    ONLINE = "ONLINE"
+    OFFLINE = "OFFLINE"
+    NEVER_CONNECTED = "NEVER_CONNECTED"
+    REVOKED = "REVOKED"
+
+class TelemetrySourceStatusResponse(BaseModel):
+    """Operational status of a registered telemetry source."""
+
+    id: int
+    name: str
+    source_type: str
+    is_active: bool
+    health_status: TelemetrySourceHealthStatus
+    last_seen_at: datetime | None
+    events_24h: int
+    last_event_at: datetime | None

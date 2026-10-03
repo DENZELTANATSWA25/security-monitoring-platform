@@ -11,11 +11,13 @@ from app.schemas.telemetry_source import (
     TelemetrySourceCreate,
     TelemetrySourceCreatedResponse,
     TelemetrySourceResponse,
+    TelemetrySourceStatusResponse,
 )
 from app.services.telemetry_source_service import (
     create_telemetry_source,
     get_all_telemetry_sources,
     get_telemetry_source_by_id,
+    get_telemetry_source_statuses,
     revoke_telemetry_source,
 )
 from app.services.audit_service import log_event
@@ -103,6 +105,23 @@ async def list_telemetry_sources(
     """List registered telemetry producers."""
 
     return await get_all_telemetry_sources(db)
+
+@router.get(
+    "/status",
+    response_model=list[TelemetrySourceStatusResponse],
+)
+async def telemetry_source_status(
+    db: AsyncSession = Depends(get_db),
+    _: User = Depends(
+        require_role(
+            UserRole.ADMIN,
+            UserRole.ANALYST,
+        )
+    ),
+):
+    """Return operational health information for telemetry sources."""
+
+    return await get_telemetry_source_statuses(db)
 
 
 @router.get(

@@ -23,6 +23,9 @@ class Settings(BaseSettings):
     INGESTION_RATE_LIMIT: int = 100
     INGESTION_RATE_WINDOW_SECONDS: int = 60
 
+    # Telemetry source health monitoring.
+    TELEMETRY_SOURCE_ONLINE_THRESHOLD_SECONDS: int = 300
+
     # Pydantic Settings v2 configuration.
     model_config = SettingsConfigDict(
         env_file=".env",

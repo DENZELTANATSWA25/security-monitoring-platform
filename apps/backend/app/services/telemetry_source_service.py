@@ -1,8 +1,8 @@
 # Service layer for registered external telemetry producers.
 
-from datetime import datetime
+from datetime import datetime, timedelta
 
-from sqlalchemy import select
+from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.telemetry_credentials import (
@@ -13,6 +13,13 @@ from app.core.telemetry_credentials import (
     verify_telemetry_secret,
 )
 from app.models.telemetry_source import TelemetrySource
+
+from app.core.config import settings
+from app.models.security_event import SecurityEvent
+from app.schemas.telemetry_source import (
+    TelemetrySourceHealthStatus,
+    TelemetrySourceStatusResponse,
+)
 
 async def create_telemetry_source(
     db: AsyncSession,
@@ -146,3 +153,89 @@ async def revoke_telemetry_source(
     await db.refresh(source)
 
     return source
+
+
+async def get_telemetry_source_statuses(
+    db: AsyncSession,
+) -> list[TelemetrySourceStatusResponse]:
+    """
+    Return operational health information for all telemetry sources.
+
+    Event statistics are aggregated in one query to avoid issuing
+    additional queries for every registered source.
+    """
+
+    now = datetime.utcnow()
+
+    online_cutoff = now - timedelta(
+        seconds=settings.TELEMETRY_SOURCE_ONLINE_THRESHOLD_SECONDS,
+    )
+
+    event_cutoff = now - timedelta(hours=24)
+
+    event_stats = (
+        select(
+            SecurityEvent.telemetry_source_id.label("source_id"),
+            func.count(SecurityEvent.id).
+            filter(
+                SecurityEvent.created_at >= event_cutoff,
+            )
+            .label("events_24h"),
+            func.max(
+                SecurityEvent.created_at,
+            ).label("last_event_at"),
+        )
+        .where(
+            SecurityEvent.telemetry_source_id.is_not(None),
+        )
+        .group_by(
+            SecurityEvent.telemetry_source_id
+        )
+        .subquery()
+    )
+
+    result = await db.execute(
+        select(
+            TelemetrySource,
+            func.coalesce(
+                event_stats.c.events_24h,
+                0,
+            ).label("events_24h"),
+            event_stats.c.last_event_at,
+        )
+        .outerjoin(
+            event_stats,
+            event_stats.c.source_id == TelemetrySource.id,
+        )
+        .order_by(TelemetrySource.created_at.desc())
+    )
+
+    statuses: list[TelemetrySourceStatusResponse] = []
+
+    for source, events_24h, last_event_at in result.all():
+        if not source.is_active:
+            health_status = TelemetrySourceHealthStatus.REVOKED
+
+        elif source.last_seen_at is None:
+            health_status = TelemetrySourceHealthStatus.NEVER_CONNECTED
+
+        elif source.last_seen_at >= online_cutoff:
+            health_status = TelemetrySourceHealthStatus.ONLINE
+
+        else:
+            health_status = TelemetrySourceHealthStatus.OFFLINE
+
+        statuses.append(
+            TelemetrySourceStatusResponse(
+                id=source.id,
+                name=source.name,
+                source_type=source.source_type,
+                is_active=source.is_active,
+                health_status=health_status,
+                last_seen_at=source.last_seen_at,
+                events_24h=events_24h,
+                last_event_at=last_event_at,
+            )
+        )
+
+    return statuses

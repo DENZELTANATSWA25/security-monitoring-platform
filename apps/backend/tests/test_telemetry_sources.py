@@ -1,5 +1,7 @@
 """Tests for administrative telemetry source management."""
 
+from datetime import datetime, timedelta
+
 from httpx import AsyncClient
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
@@ -7,6 +9,8 @@ from sqlalchemy import select
 from app.models.telemetry_source import TelemetrySource
 from app.models.audit_log import AuditLog
 from app.models.telemetry_source import TelemetrySource
+
+from app.models.security_event import SecurityEvent, EventSeverity
 
 from app.services.telemetry_source_service import create_telemetry_source
 
@@ -414,3 +418,322 @@ async def test_telemetry_source_revocation_rolls_back_when_audit_fails(
     source = result.scalar_one()
 
     assert source.is_active is True
+
+async def test_telemetry_source_status_requires_authentication(
+    client: AsyncClient,
+) -> None:
+    """Operational telemetry status must not be publicly accessible."""
+
+    response = await client.get(
+        "/api/v1/telemetry-sources/status",
+    )
+
+    assert response.status_code == 401
+
+
+async def test_viewer_cannot_read_telemetry_source_status(
+    viewer_client: AsyncClient,
+) -> None:
+    """Viewers must not have access to telemetry source monitoring."""
+
+    response = await viewer_client.get(
+        "/api/v1/telemetry-sources/status",
+    )
+
+    assert response.status_code == 403
+
+
+async def test_analyst_can_read_telemetry_source_status(
+    analyst_client: AsyncClient,
+    db_session: AsyncSession,
+) -> None:
+    """Analysts should be able to monitor telemetry producers."""
+
+    source, _ = await create_telemetry_source(
+        db=db_session,
+        name="Analyst Status Source",
+        source_type="test-agent",
+    )
+
+    await db_session.commit()
+
+    response = await analyst_client.get(
+        "/api/v1/telemetry-sources/status",
+    )
+
+    assert response.status_code == 200
+
+    matching_sources = [
+        item
+        for item in response.json()
+        if item["id"] == source.id
+    ]
+
+    assert len(matching_sources) == 1
+
+
+async def test_never_connected_source_reports_never_connected(
+    admin_client: AsyncClient,
+    db_session: AsyncSession,
+) -> None:
+    """A source with no successful ingestion should report NEVER_CONNECTED."""
+
+    source, _ = await create_telemetry_source(
+        db=db_session,
+        name="Never Connected Source",
+        source_type="test-agent",
+    )
+
+    await db_session.commit()
+
+    response = await admin_client.get(
+        "/api/v1/telemetry-sources/status",
+    )
+
+    assert response.status_code == 200
+
+    item = next(
+        item
+        for item in response.json()
+        if item["id"] == source.id
+    )
+
+    assert item["health_status"] == "NEVER_CONNECTED"
+    assert item["last_seen_at"] is None
+    assert item["events_24h"] == 0
+    assert item["last_event_at"] is None
+
+
+async def test_recently_seen_source_reports_online(
+    admin_client: AsyncClient,
+    db_session: AsyncSession,
+) -> None:
+    """A recently active source should report ONLINE."""
+
+    source, _ = await create_telemetry_source(
+        db=db_session,
+        name="Online Status Source",
+        source_type="test-agent",
+    )
+
+    source.last_seen_at = datetime.utcnow()
+
+    await db_session.commit()
+
+    response = await admin_client.get(
+        "/api/v1/telemetry-sources/status",
+    )
+
+    assert response.status_code == 200
+
+    item = next(
+        item
+        for item in response.json()
+        if item["id"] == source.id
+    )
+
+    assert item["health_status"] == "ONLINE"
+
+
+async def test_stale_source_reports_offline(
+    admin_client: AsyncClient,
+    db_session: AsyncSession,
+) -> None:
+    """An active source not seen recently should report OFFLINE."""
+
+    source, _ = await create_telemetry_source(
+        db=db_session,
+        name="Offline Status Source",
+        source_type="test-agent",
+    )
+
+    source.last_seen_at = (
+        datetime.utcnow()
+        - timedelta(minutes=10)
+    )
+
+    await db_session.commit()
+
+    response = await admin_client.get(
+        "/api/v1/telemetry-sources/status",
+    )
+
+    assert response.status_code == 200
+
+    item = next(
+        item
+        for item in response.json()
+        if item["id"] == source.id
+    )
+
+    assert item["health_status"] == "OFFLINE"
+
+
+async def test_revoked_source_reports_revoked(
+    admin_client: AsyncClient,
+    db_session: AsyncSession,
+) -> None:
+    """Revocation should take precedence over activity state."""
+
+    source, _ = await create_telemetry_source(
+        db=db_session,
+        name="Revoked Status Source",
+        source_type="test-agent",
+    )
+
+    source.last_seen_at = datetime.utcnow()
+    source.is_active = False
+
+    await db_session.commit()
+
+    response = await admin_client.get(
+        "/api/v1/telemetry-sources/status",
+    )
+
+    assert response.status_code == 200
+
+    item = next(
+        item
+        for item in response.json()
+        if item["id"] == source.id
+    )
+
+    assert item["health_status"] == "REVOKED"
+
+async def test_telemetry_source_status_reports_event_statistics(
+    admin_client: AsyncClient,
+    db_session: AsyncSession,
+) -> None:
+    """
+    Status should count only events from the last 24 hours while
+    preserving the most recent event timestamp across all history.
+    """
+
+    source, _ = await create_telemetry_source(
+        db=db_session,
+        name="Statistics Test Source",
+        source_type="test-agent",
+    )
+
+    other_source, _ = await create_telemetry_source(
+        db=db_session,
+        name="Unrelated Statistics Source",
+        source_type="test-agent",
+    )
+
+    now = datetime.utcnow()
+
+    old_event = SecurityEvent(
+        event_type="OLD_TELEMETRY_EVENT",
+        severity=EventSeverity.INFO,
+        source="statistics-test",
+        message="Historical event",
+        telemetry_source_id=source.id,
+        created_at=now - timedelta(days=3),
+    )
+
+    recent_event_one = SecurityEvent(
+        event_type="RECENT_TELEMETRY_EVENT_ONE",
+        severity=EventSeverity.INFO,
+        source="statistics-test",
+        message="Recent event one",
+        telemetry_source_id=source.id,
+        created_at=now - timedelta(hours=2),
+    )
+
+    recent_event_two = SecurityEvent(
+        event_type="RECENT_TELEMETRY_EVENT_TWO",
+        severity=EventSeverity.WARNING,
+        source="statistics-test",
+        message="Recent event two",
+        telemetry_source_id=source.id,
+        created_at=now - timedelta(minutes=30),
+    )
+
+    unrelated_event = SecurityEvent(
+        event_type="UNRELATED_TELEMETRY_EVENT",
+        severity=EventSeverity.INFO,
+        source="unrelated-test",
+        message="Event belonging to another producer",
+        telemetry_source_id=other_source.id,
+        created_at=now - timedelta(minutes=5),
+    )
+
+    db_session.add_all(
+        [
+            old_event,
+            recent_event_one,
+            recent_event_two,
+            unrelated_event,
+        ]
+    )
+
+    await db_session.commit()
+
+    response = await admin_client.get(
+        "/api/v1/telemetry-sources/status",
+    )
+
+    assert response.status_code == 200
+
+    item = next(
+        item
+        for item in response.json()
+        if item["id"] == source.id
+    )
+
+    assert item["events_24h"] == 2
+    assert item["last_event_at"] is not None
+
+    returned_last_event = datetime.fromisoformat(
+        item["last_event_at"],
+    )
+
+    assert returned_last_event == recent_event_two.created_at
+
+async def test_old_event_is_preserved_as_last_event(
+    admin_client: AsyncClient,
+    db_session: AsyncSession,
+) -> None:
+    """
+    A historical event should not count toward events_24h but should
+    still be reported as the source's most recent known event.
+    """
+
+    source, _ = await create_telemetry_source(
+        db=db_session,
+        name="Historical Event Source",
+        source_type="test-agent",
+    )
+
+    event = SecurityEvent(
+        event_type="HISTORICAL_TELEMETRY_EVENT",
+        severity=EventSeverity.INFO,
+        source="historical-test",
+        message="Historical telemetry",
+        telemetry_source_id=source.id,
+        created_at=datetime.utcnow() - timedelta(days=3),
+    )
+
+    db_session.add(event)
+    await db_session.commit()
+    await db_session.refresh(event)
+
+    response = await admin_client.get(
+        "/api/v1/telemetry-sources/status",
+    )
+
+    assert response.status_code == 200
+
+    item = next(
+        item
+        for item in response.json()
+        if item["id"] == source.id
+    )
+
+    assert item["events_24h"] == 0
+    assert item["last_event_at"] is not None
+
+    assert datetime.fromisoformat(
+        item["last_event_at"],
+    ) == event.created_at
