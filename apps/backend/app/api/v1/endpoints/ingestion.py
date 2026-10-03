@@ -3,7 +3,7 @@
 from fastapi import APIRouter, Depends, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.core.ingestion_auth import require_telemetry_source
+from app.core.ingestion_rate_limit import require_ingestion_rate_limit
 from app.db.session import get_db
 from app.models.telemetry_source import TelemetrySource
 from app.schemas.ingestion import TelemetryEventCreate
@@ -26,7 +26,7 @@ router = APIRouter(
 async def ingest_event(
     telemetry: TelemetryEventCreate,
     db: AsyncSession = Depends(get_db),
-    telemetry_source: TelemetrySource = Depends(require_telemetry_source),
+    telemetry_source: TelemetrySource = Depends(require_ingestion_rate_limit),
 ):
     """Receive a security event from an authenticated telemetry producer."""
 

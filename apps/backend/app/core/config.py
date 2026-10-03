@@ -19,10 +19,15 @@ class Settings(BaseSettings):
     # Machine-to-machine authentication for external telemetry ingestion.
     INGESTION_API_KEY_HEADER: str = "X-Ingestion-Key"
 
+    # Per-source telemetry ingestion rate limiting.
+    INGESTION_RATE_LIMIT: int = 100
+    INGESTION_RATE_WINDOW_SECONDS: int = 60
+
     # Pydantic Settings v2 configuration.
     model_config = SettingsConfigDict(
         env_file=".env",
     )
+
 
 
 settings = Settings()

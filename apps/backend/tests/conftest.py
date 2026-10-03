@@ -15,6 +15,10 @@ from app.models.security_event import SecurityEvent, EventSeverity
 from app.models.incident import Incident
 from app.models.alert import Alert
 
+from collections.abc import AsyncIterator
+from redis.asyncio import Redis
+from app.core.redis import get_redis
+
 
 TEST_PASSWORD = "TestPassword123!"
 
@@ -38,6 +42,30 @@ def test_database_url() -> str:
         )
 
     return database_url
+
+@pytest.fixture
+async def redis_client() -> AsyncIterator[Redis]:
+    """
+    Provide an isolated Redis database for each test.
+
+    Redis database 1 is reserved for automated tests. The database is
+    cleared before and after each test so rate-limit state cannot leak
+    between tests.
+    """
+
+    client = Redis.from_url(
+        settings.REDIS_URL,
+        db=1,
+        decode_responses=True,
+    )
+
+    await client.flushdb()
+
+    try:
+        yield client
+    finally:
+        await client.flushdb()
+        await client.aclose()
 
 
 @pytest.fixture
@@ -72,13 +100,18 @@ async def db_session(
 @pytest.fixture
 async def client(
     db_session: AsyncSession,
+    redis_client: Redis,
 ) -> AsyncClient:
     """Provide an HTTP client using the isolated test database."""
 
     async def override_get_db():
         yield db_session
 
+    async def override_get_redis():
+        yield redis_client
+
     app.dependency_overrides[get_db] = override_get_db
+    app.dependency_overrides[get_redis] = override_get_redis
 
     transport = ASGITransport(app=app)
 
