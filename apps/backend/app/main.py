@@ -14,6 +14,7 @@ from app.api.v1.endpoints import (
     reports,
     ingestion,
     telemetry_sources,
+    detection_rules,
 )
 
 from app.core.config import settings
@@ -78,6 +79,10 @@ app.include_router(
 )
 app.include_router(
     telemetry_sources.router,
+    prefix="/api/v1",
+)
+app.include_router(
+    detection_rules.router,
     prefix="/api/v1",
 )
 

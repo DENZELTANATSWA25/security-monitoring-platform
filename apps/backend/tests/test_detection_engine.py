@@ -94,6 +94,7 @@ async def test_engine_ignores_non_triggered_rules(
     """Rules that do not trigger should not appear in engine output."""
 
     rule = AsyncMock()
+    rule.name = "TEST_NON_TRIGGERED_RULE"
     rule.evaluate.return_value = DetectionResult.not_triggered()
     context = DetectionContext()
 
@@ -126,6 +127,7 @@ async def test_engine_collects_triggered_results(
     context = DetectionContext()
 
     rule = AsyncMock()
+    rule.name = "TEST_TRIGGERED_RULE"
     rule.evaluate.return_value = detection
 
     with patch(
@@ -158,12 +160,15 @@ async def test_engine_collects_multiple_triggered_results(
     )
 
     first_rule = AsyncMock()
+    first_rule.name = "FIRST_TEST_RULE"
     first_rule.evaluate.return_value = first_detection
 
     ignored_rule = AsyncMock()
+    ignored_rule.name = "IGNORED_TEST_RULE"
     ignored_rule.evaluate.return_value = DetectionResult.not_triggered()
 
     second_rule = AsyncMock()
+    second_rule.name = "SECOND_TEST_RULE"
     second_rule.evaluate.return_value = second_detection
     context = DetectionContext()
 
@@ -198,6 +203,7 @@ async def test_engine_propagates_rule_failure(
     context = DetectionContext()
 
     rule = AsyncMock()
+    rule.name = "FAILING_TEST_RULE"
     rule.evaluate.side_effect = RuntimeError(
         "Synthetic detection failure"
     )
@@ -905,3 +911,181 @@ async def test_impossible_travel_history_is_isolated_by_account(
     )
 
     assert result == DetectionResult.not_triggered()
+
+async def test_engine_executes_enabled_configured_rule(
+    db_session: AsyncSession,
+) -> None:
+    """A rule with enabled persisted configuration should execute."""
+
+    from app.models.detection_rule_config import DetectionRuleConfig
+
+    config = DetectionRuleConfig(
+        rule_name="CONFIGURED_ENABLED_RULE",
+        display_name="Configured Enabled Rule",
+        description="Enabled rule used by the engine integration test.",
+        is_enabled=True,
+    )
+
+    db_session.add(config)
+    await db_session.flush()
+
+    rule = AsyncMock()
+    rule.name = "CONFIGURED_ENABLED_RULE"
+    rule.evaluate.return_value = DetectionResult.not_triggered()
+
+    context = DetectionContext()
+
+    with patch(
+        "app.services.detection.engine.rules",
+        [rule],
+    ):
+        results = await run_detection(
+            db_session,
+            context,
+        )
+
+    assert results == []
+
+    rule.evaluate.assert_awaited_once_with(
+        db_session,
+        context,
+    )
+
+
+async def test_engine_skips_disabled_configured_rule(
+    db_session: AsyncSession,
+) -> None:
+    """A disabled persisted rule must not be evaluated."""
+
+    from app.models.detection_rule_config import DetectionRuleConfig
+
+    config = DetectionRuleConfig(
+        rule_name="CONFIGURED_DISABLED_RULE",
+        display_name="Configured Disabled Rule",
+        description="Disabled rule used by the engine integration test.",
+        is_enabled=False,
+    )
+
+    db_session.add(config)
+    await db_session.flush()
+
+    rule = AsyncMock()
+    rule.name = "CONFIGURED_DISABLED_RULE"
+
+    context = DetectionContext()
+
+    with patch(
+        "app.services.detection.engine.rules",
+        [rule],
+    ):
+        results = await run_detection(
+            db_session,
+            context,
+        )
+
+    assert results == []
+    rule.evaluate.assert_not_awaited()
+
+
+async def test_engine_executes_unconfigured_rule_by_default(
+    db_session: AsyncSession,
+) -> None:
+    """Rules without persisted configuration should remain enabled."""
+
+    rule = AsyncMock()
+    rule.name = "UNCONFIGURED_ENGINE_TEST_RULE"
+    rule.evaluate.return_value = DetectionResult.not_triggered()
+
+    context = DetectionContext()
+
+    with patch(
+        "app.services.detection.engine.rules",
+        [rule],
+    ):
+        results = await run_detection(
+            db_session,
+            context,
+        )
+
+    assert results == []
+
+    rule.evaluate.assert_awaited_once_with(
+        db_session,
+        context,
+    )
+
+
+async def test_engine_only_executes_operationally_enabled_rules(
+    db_session: AsyncSession,
+) -> None:
+    """Mixed rule configuration should execute only operational rules."""
+
+    from app.models.detection_rule_config import DetectionRuleConfig
+
+    enabled_config = DetectionRuleConfig(
+        rule_name="MIXED_ENABLED_RULE",
+        display_name="Mixed Enabled Rule",
+        description="Enabled rule in a mixed engine test.",
+        is_enabled=True,
+    )
+
+    disabled_config = DetectionRuleConfig(
+        rule_name="MIXED_DISABLED_RULE",
+        display_name="Mixed Disabled Rule",
+        description="Disabled rule in a mixed engine test.",
+        is_enabled=False,
+    )
+
+    db_session.add_all([
+        enabled_config,
+        disabled_config,
+    ])
+    await db_session.flush()
+
+    enabled_detection = DetectionResult.triggered_alert(
+        alert_type="MIXED_ENABLED_ALERT",
+        severity="HIGH",
+        message="Enabled configured rule triggered.",
+    )
+
+    enabled_rule = AsyncMock()
+    enabled_rule.name = "MIXED_ENABLED_RULE"
+    enabled_rule.evaluate.return_value = enabled_detection
+
+    disabled_rule = AsyncMock()
+    disabled_rule.name = "MIXED_DISABLED_RULE"
+
+    unconfigured_rule = AsyncMock()
+    unconfigured_rule.name = "MIXED_UNCONFIGURED_RULE"
+    unconfigured_rule.evaluate.return_value = (
+        DetectionResult.not_triggered()
+    )
+
+    context = DetectionContext()
+
+    with patch(
+        "app.services.detection.engine.rules",
+        [
+            enabled_rule,
+            disabled_rule,
+            unconfigured_rule,
+        ],
+    ):
+        results = await run_detection(
+            db_session,
+            context,
+        )
+
+    assert results == [enabled_detection]
+
+    enabled_rule.evaluate.assert_awaited_once_with(
+        db_session,
+        context,
+    )
+
+    disabled_rule.evaluate.assert_not_awaited()
+
+    unconfigured_rule.evaluate.assert_awaited_once_with(
+        db_session,
+        context,
+    )

@@ -11,6 +11,7 @@ from app.models.incident_alert_link import IncidentAlertLink
 from app.models.incident_evidence import IncidentEvidence
 from app.models.incident_resolution import IncidentResolution
 from app.models.telemetry_source import TelemetrySource
+from app.models.detection_rule_config import DetectionRuleConfig
 
 __all__ = [
     "User",
@@ -26,4 +27,5 @@ __all__ = [
     "IncidentEvidence",
     "IncidentResolution",
     "TelemetrySource",
+    "DetectionRuleConfig",
 ]
