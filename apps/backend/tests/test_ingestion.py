@@ -8,6 +8,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models.security_event import SecurityEvent
 from app.services.telemetry_source_service import create_telemetry_source
+from app.models.alert import Alert
 
 
 async def test_ingestion_requires_credentials(
@@ -144,3 +145,58 @@ async def test_authenticated_external_event_is_ingested(
     await db_session.refresh(source)
 
     assert source.last_seen_at is not None
+
+
+async def test_external_ingestion_runs_detection_and_creates_alert(
+    client: AsyncClient,
+    db_session: AsyncSession,
+) -> None:
+    """
+    Authenticated external telemetry must pass through the canonical
+    detection pipeline and persist any generated alerts.
+    """
+
+    source, credential = await create_telemetry_source(
+        db=db_session,
+        name="Burst Detection Test Agent",
+        source_type="test-agent",
+    )
+
+    event_source = "external-burst-test-source"
+
+    # The existing EVENT_BURST rule triggers when five recent events
+    # originate from the same source.
+    for index in range(5):
+        response = await client.post(
+            "/api/v1/ingestion/events",
+            headers={
+                "X-Ingestion-Key": credential.credential,
+            },
+            json={
+                "event_type": f"EXTERNAL_BURST_EVENT_{index}",
+                "severity": "WARNING",
+                "source": event_source,
+                "description": f"External burst event {index}",
+                "event_metadata": {
+                    "hostname": event_source,
+                },
+            },
+        )
+
+        assert response.status_code == 201
+
+    result = await db_session.execute(
+        select(Alert).where(
+            Alert.alert_type == "EVENT_BURST",
+        )
+    )
+
+    alerts = result.scalars().all()
+
+    assert len(alerts) == 1
+
+    alert = alerts[0]
+
+    assert alert.severity == "HIGH"
+    assert alert.message is not None
+    assert event_source in alert.message
