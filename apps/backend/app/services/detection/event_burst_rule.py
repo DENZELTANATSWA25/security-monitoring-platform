@@ -13,32 +13,48 @@ from app.services.detection.base import (
 from app.services.detection.result import DetectionResult
 
 class EventBurstRule(DetectionRule):
-    # Detect a burst of security events from the same source.
+    """Detect a burst of security events from the same source."""
 
     name = "EVENT_BURST"
 
     EVENT_THRESHOLD = 5
     WINDOW_MINUTES = 5
 
+    def __init__(
+        self,
+        *,
+        event_threshold: int | None = None,
+        window_minutes: int | None = None,
+    ) -> None:
+        self.event_threshold = (
+            event_threshold
+            if event_threshold is not None
+            else self.EVENT_THRESHOLD
+        )
+
+        self.window_minutes = (
+            window_minutes
+            if window_minutes is not None
+            else self.WINDOW_MINUTES
+        )
+
     async def evaluate(
-            self,
-            db: AsyncSession,
-            context: DetectionContext,
+        self,
+        db: AsyncSession,
+        context: DetectionContext,
     ) -> DetectionResult:
         event = context.event
 
-        # this rule only applies to securty-event ingestion
         if event is None:
             return DetectionResult.not_triggered()
 
         if not event.source:
             return DetectionResult.not_triggered()
 
-        # The cuurent event has already been flushed by event_service, so its creation time can anchor the detection window
         reference_time = event.created_at or datetime.utcnow()
 
         window_start = reference_time - timedelta(
-            minutes=self.WINDOW_MINUTES,
+            minutes=self.window_minutes,
         )
 
         result = await db.execute(
@@ -52,7 +68,7 @@ class EventBurstRule(DetectionRule):
 
         event_count = result.scalar_one()
 
-        if event_count < self.EVENT_THRESHOLD:
+        if event_count < self.event_threshold:
             return DetectionResult.not_triggered()
 
         return DetectionResult.triggered_alert(
@@ -61,6 +77,6 @@ class EventBurstRule(DetectionRule):
             message=(
                 f"High event frequency detected from source "
                 f"{event.source}: {event_count} events within "
-                f"{self.WINDOW_MINUTES} minutes"
+                f"{self.window_minutes} minutes"
             ),
         )

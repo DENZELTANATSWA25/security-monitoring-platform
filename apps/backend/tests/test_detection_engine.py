@@ -87,20 +87,24 @@ def test_haversine_distance_between_london_and_new_york() -> None:
         abs=20,
     )
 
-
 async def test_engine_ignores_non_triggered_rules(
     db_session: AsyncSession,
 ) -> None:
     """Rules that do not trigger should not appear in engine output."""
 
     rule = AsyncMock()
-    rule.name = "TEST_NON_TRIGGERED_RULE"
     rule.evaluate.return_value = DetectionResult.not_triggered()
     context = DetectionContext()
 
-    with patch(
-        "app.services.detection.engine.rules",
-        [rule],
+    with (
+        patch(
+            "app.services.detection.engine.rule_names",
+            ["BRUTE_FORCE_ATTACK"],
+        ),
+        patch(
+            "app.services.detection.engine.build_detection_rule",
+            return_value=rule,
+        ) as build_rule_mock,
     ):
         results = await run_detection(
             db_session,
@@ -108,6 +112,10 @@ async def test_engine_ignores_non_triggered_rules(
         )
 
     assert results == []
+
+    build_rule_mock.assert_called_once_with(
+        "BRUTE_FORCE_ATTACK",
+    )
     rule.evaluate.assert_awaited_once_with(
         db_session,
         context,
@@ -124,15 +132,20 @@ async def test_engine_collects_triggered_results(
         severity="HIGH",
         message="Test detection triggered.",
     )
-    context = DetectionContext()
 
     rule = AsyncMock()
-    rule.name = "TEST_TRIGGERED_RULE"
     rule.evaluate.return_value = detection
+    context = DetectionContext()
 
-    with patch(
-        "app.services.detection.engine.rules",
-        [rule],
+    with (
+        patch(
+            "app.services.detection.engine.rule_names",
+            ["BRUTE_FORCE_ATTACK"],
+        ),
+        patch(
+            "app.services.detection.engine.build_detection_rule",
+            return_value=rule,
+        ),
     ):
         results = await run_detection(
             db_session,
@@ -140,6 +153,11 @@ async def test_engine_collects_triggered_results(
         )
 
     assert results == [detection]
+
+    rule.evaluate.assert_awaited_once_with(
+        db_session,
+        context,
+    )
 
 
 async def test_engine_collects_multiple_triggered_results(
@@ -160,25 +178,41 @@ async def test_engine_collects_multiple_triggered_results(
     )
 
     first_rule = AsyncMock()
-    first_rule.name = "FIRST_TEST_RULE"
     first_rule.evaluate.return_value = first_detection
 
     ignored_rule = AsyncMock()
-    ignored_rule.name = "IGNORED_TEST_RULE"
     ignored_rule.evaluate.return_value = DetectionResult.not_triggered()
 
     second_rule = AsyncMock()
-    second_rule.name = "SECOND_TEST_RULE"
     second_rule.evaluate.return_value = second_detection
+
+    rules_by_name = {
+        "BRUTE_FORCE_ATTACK": first_rule,
+        "EVENT_BURST": ignored_rule,
+        "SUSPICIOUS_LOGIN": second_rule,
+    }
+
+    def build_rule(
+        rule_name: str,
+        parameters=None,
+    ):
+        return rules_by_name[rule_name]
+
     context = DetectionContext()
 
-    with patch(
-        "app.services.detection.engine.rules",
-        [
-            first_rule,
-            ignored_rule,
-            second_rule,
-        ],
+    with (
+        patch(
+            "app.services.detection.engine.rule_names",
+            [
+                "BRUTE_FORCE_ATTACK",
+                "EVENT_BURST",
+                "SUSPICIOUS_LOGIN",
+            ],
+        ),
+        patch(
+            "app.services.detection.engine.build_detection_rule",
+            side_effect=build_rule,
+        ),
     ):
         results = await run_detection(
             db_session,
@@ -190,6 +224,19 @@ async def test_engine_collects_multiple_triggered_results(
         second_detection,
     ]
 
+    first_rule.evaluate.assert_awaited_once_with(
+        db_session,
+        context,
+    )
+    ignored_rule.evaluate.assert_awaited_once_with(
+        db_session,
+        context,
+    )
+    second_rule.evaluate.assert_awaited_once_with(
+        db_session,
+        context,
+    )
+
 
 async def test_engine_propagates_rule_failure(
     db_session: AsyncSession,
@@ -200,17 +247,23 @@ async def test_engine_propagates_rule_failure(
     Event and login-attempt services are responsible for rolling back their
     database transactions when detection fails.
     """
-    context = DetectionContext()
 
     rule = AsyncMock()
-    rule.name = "FAILING_TEST_RULE"
     rule.evaluate.side_effect = RuntimeError(
         "Synthetic detection failure"
     )
 
-    with patch(
-        "app.services.detection.engine.rules",
-        [rule],
+    context = DetectionContext()
+
+    with (
+        patch(
+            "app.services.detection.engine.rule_names",
+            ["BRUTE_FORCE_ATTACK"],
+        ),
+        patch(
+            "app.services.detection.engine.build_detection_rule",
+            return_value=rule,
+        ),
     ):
         with pytest.raises(
             RuntimeError,
@@ -915,29 +968,37 @@ async def test_impossible_travel_history_is_isolated_by_account(
 async def test_engine_executes_enabled_configured_rule(
     db_session: AsyncSession,
 ) -> None:
-    """A rule with enabled persisted configuration should execute."""
+    """An enabled persisted rule should be built and executed."""
 
     from app.models.detection_rule_config import DetectionRuleConfig
 
     config = DetectionRuleConfig(
-        rule_name="CONFIGURED_ENABLED_RULE",
-        display_name="Configured Enabled Rule",
-        description="Enabled rule used by the engine integration test.",
+        rule_name="BRUTE_FORCE_ATTACK",
+        display_name="Brute Force Attack",
+        description="Configured brute-force rule.",
         is_enabled=True,
+        parameters={
+            "failed_attempts_threshold": 10,
+        },
     )
 
     db_session.add(config)
     await db_session.flush()
 
     rule = AsyncMock()
-    rule.name = "CONFIGURED_ENABLED_RULE"
     rule.evaluate.return_value = DetectionResult.not_triggered()
 
     context = DetectionContext()
 
-    with patch(
-        "app.services.detection.engine.rules",
-        [rule],
+    with (
+        patch(
+            "app.services.detection.engine.rule_names",
+            ["BRUTE_FORCE_ATTACK"],
+        ),
+        patch(
+            "app.services.detection.engine.build_detection_rule",
+            return_value=rule,
+        ) as build_rule_mock,
     ):
         results = await run_detection(
             db_session,
@@ -945,6 +1006,13 @@ async def test_engine_executes_enabled_configured_rule(
         )
 
     assert results == []
+
+    build_rule_mock.assert_called_once_with(
+        "BRUTE_FORCE_ATTACK",
+        {
+            "failed_attempts_threshold": 10,
+        },
+    )
 
     rule.evaluate.assert_awaited_once_with(
         db_session,
@@ -955,52 +1023,60 @@ async def test_engine_executes_enabled_configured_rule(
 async def test_engine_skips_disabled_configured_rule(
     db_session: AsyncSession,
 ) -> None:
-    """A disabled persisted rule must not be evaluated."""
+    """A disabled persisted rule must not be constructed or evaluated."""
 
     from app.models.detection_rule_config import DetectionRuleConfig
 
     config = DetectionRuleConfig(
-        rule_name="CONFIGURED_DISABLED_RULE",
-        display_name="Configured Disabled Rule",
-        description="Disabled rule used by the engine integration test.",
+        rule_name="BRUTE_FORCE_ATTACK",
+        display_name="Brute Force Attack",
+        description="Disabled brute-force rule.",
         is_enabled=False,
+        parameters={
+            "failed_attempts_threshold": 10,
+        },
     )
 
     db_session.add(config)
     await db_session.flush()
 
-    rule = AsyncMock()
-    rule.name = "CONFIGURED_DISABLED_RULE"
-
-    context = DetectionContext()
-
-    with patch(
-        "app.services.detection.engine.rules",
-        [rule],
+    with (
+        patch(
+            "app.services.detection.engine.rule_names",
+            ["BRUTE_FORCE_ATTACK"],
+        ),
+        patch(
+            "app.services.detection.engine.build_detection_rule",
+        ) as build_rule_mock,
     ):
         results = await run_detection(
             db_session,
-            context,
+            DetectionContext(),
         )
 
     assert results == []
-    rule.evaluate.assert_not_awaited()
+    build_rule_mock.assert_not_called()
 
 
 async def test_engine_executes_unconfigured_rule_by_default(
     db_session: AsyncSession,
 ) -> None:
-    """Rules without persisted configuration should remain enabled."""
+    """Rules without persisted configuration should use factory defaults."""
 
     rule = AsyncMock()
-    rule.name = "UNCONFIGURED_ENGINE_TEST_RULE"
     rule.evaluate.return_value = DetectionResult.not_triggered()
 
     context = DetectionContext()
 
-    with patch(
-        "app.services.detection.engine.rules",
-        [rule],
+    with (
+        patch(
+            "app.services.detection.engine.rule_names",
+            ["BRUTE_FORCE_ATTACK"],
+        ),
+        patch(
+            "app.services.detection.engine.build_detection_rule",
+            return_value=rule,
+        ) as build_rule_mock,
     ):
         results = await run_detection(
             db_session,
@@ -1008,6 +1084,10 @@ async def test_engine_executes_unconfigured_rule_by_default(
         )
 
     assert results == []
+
+    build_rule_mock.assert_called_once_with(
+        "BRUTE_FORCE_ATTACK",
+    )
 
     rule.evaluate.assert_awaited_once_with(
         db_session,
@@ -1018,22 +1098,29 @@ async def test_engine_executes_unconfigured_rule_by_default(
 async def test_engine_only_executes_operationally_enabled_rules(
     db_session: AsyncSession,
 ) -> None:
-    """Mixed rule configuration should execute only operational rules."""
+    """Mixed configuration should execute only operational rules."""
 
     from app.models.detection_rule_config import DetectionRuleConfig
 
     enabled_config = DetectionRuleConfig(
-        rule_name="MIXED_ENABLED_RULE",
-        display_name="Mixed Enabled Rule",
-        description="Enabled rule in a mixed engine test.",
+        rule_name="BRUTE_FORCE_ATTACK",
+        display_name="Brute Force Attack",
+        description="Enabled configured rule.",
         is_enabled=True,
+        parameters={
+            "failed_attempts_threshold": 10,
+        },
     )
 
     disabled_config = DetectionRuleConfig(
-        rule_name="MIXED_DISABLED_RULE",
-        display_name="Mixed Disabled Rule",
-        description="Disabled rule in a mixed engine test.",
+        rule_name="EVENT_BURST",
+        display_name="Event Burst",
+        description="Disabled configured rule.",
         is_enabled=False,
+        parameters={
+            "event_threshold": 10,
+            "window_minutes": 15,
+        },
     )
 
     db_session.add_all([
@@ -1043,33 +1130,48 @@ async def test_engine_only_executes_operationally_enabled_rules(
     await db_session.flush()
 
     enabled_detection = DetectionResult.triggered_alert(
-        alert_type="MIXED_ENABLED_ALERT",
+        alert_type="BRUTE_FORCE_ATTACK",
         severity="HIGH",
         message="Enabled configured rule triggered.",
     )
 
     enabled_rule = AsyncMock()
-    enabled_rule.name = "MIXED_ENABLED_RULE"
     enabled_rule.evaluate.return_value = enabled_detection
 
-    disabled_rule = AsyncMock()
-    disabled_rule.name = "MIXED_DISABLED_RULE"
-
     unconfigured_rule = AsyncMock()
-    unconfigured_rule.name = "MIXED_UNCONFIGURED_RULE"
     unconfigured_rule.evaluate.return_value = (
         DetectionResult.not_triggered()
     )
 
+    def build_rule(
+        rule_name: str,
+        parameters=None,
+    ):
+        if rule_name == "BRUTE_FORCE_ATTACK":
+            return enabled_rule
+
+        if rule_name == "SUSPICIOUS_LOGIN":
+            return unconfigured_rule
+
+        raise AssertionError(
+            f"Unexpected rule construction: {rule_name}"
+        )
+
     context = DetectionContext()
 
-    with patch(
-        "app.services.detection.engine.rules",
-        [
-            enabled_rule,
-            disabled_rule,
-            unconfigured_rule,
-        ],
+    with (
+        patch(
+            "app.services.detection.engine.rule_names",
+            [
+                "BRUTE_FORCE_ATTACK",
+                "EVENT_BURST",
+                "SUSPICIOUS_LOGIN",
+            ],
+        ),
+        patch(
+            "app.services.detection.engine.build_detection_rule",
+            side_effect=build_rule,
+        ) as build_rule_mock,
     ):
         results = await run_detection(
             db_session,
@@ -1078,14 +1180,225 @@ async def test_engine_only_executes_operationally_enabled_rules(
 
     assert results == [enabled_detection]
 
+    assert build_rule_mock.call_count == 2
+
     enabled_rule.evaluate.assert_awaited_once_with(
         db_session,
         context,
     )
 
-    disabled_rule.evaluate.assert_not_awaited()
-
     unconfigured_rule.evaluate.assert_awaited_once_with(
         db_session,
         context,
     )
+
+async def test_brute_force_rule_uses_custom_threshold(
+    db_session: AsyncSession,
+) -> None:
+    """Configured brute-force thresholds should control detection."""
+
+    attempt = LoginAttempt(
+        email="custom-threshold@example.com",
+        successful=False,
+        ip_address="192.0.2.20",
+    )
+
+    rule = BruteForceRule(
+        failed_attempts_threshold=10,
+    )
+
+    with patch(
+        "app.services.detection.brute_force_rule.count_failed_attempts",
+        new=AsyncMock(return_value=5),
+    ):
+        result = await rule.evaluate(
+            db_session,
+            DetectionContext(
+                login_attempt=attempt,
+            ),
+        )
+
+    assert result == DetectionResult.not_triggered()
+
+async def test_event_burst_rule_uses_custom_threshold(
+    db_session: AsyncSession,
+) -> None:
+    """Configured event thresholds should control burst detection."""
+
+    source = "custom-burst-threshold"
+    reference_time = datetime.utcnow()
+
+    events = [
+        SecurityEvent(
+            event_type=f"CUSTOM_BURST_{index}",
+            severity=EventSeverity.INFO,
+            source=source,
+            message=f"Custom burst event {index}",
+            created_at=reference_time - timedelta(seconds=index),
+        )
+        for index in range(5)
+    ]
+
+    db_session.add_all(events)
+    await db_session.flush()
+
+    result = await EventBurstRule(
+        event_threshold=10,
+    ).evaluate(
+        db_session,
+        DetectionContext(
+            event=events[0],
+        ),
+    )
+
+    assert result == DetectionResult.not_triggered()
+
+async def test_impossible_travel_rule_uses_custom_speed_threshold(
+    db_session: AsyncSession,
+) -> None:
+    """Configured travel-speed thresholds should control detection."""
+
+    email = "custom-travel-speed@example.com"
+    current_time = datetime.utcnow()
+
+    previous_attempt = LoginAttempt(
+        email=email,
+        successful=True,
+        ip_address="192.0.2.220",
+        latitude=51.5074,
+        longitude=-0.1278,
+        timestamp=current_time - timedelta(hours=1),
+    )
+
+    current_attempt = LoginAttempt(
+        email=email,
+        successful=True,
+        ip_address="203.0.113.220",
+        latitude=40.7128,
+        longitude=-74.0060,
+        timestamp=current_time,
+    )
+
+    db_session.add_all([
+        previous_attempt,
+        current_attempt,
+    ])
+    await db_session.flush()
+
+    result = await ImpossibleTravelRule(
+        max_travel_speed_kmh=6000.0,
+    ).evaluate(
+        db_session,
+        DetectionContext(
+            login_attempt=current_attempt,
+        ),
+    )
+
+    assert result == DetectionResult.not_triggered()
+
+async def test_engine_applies_persisted_brute_force_threshold(
+    db_session: AsyncSession,
+) -> None:
+    """Persisted parameters should change brute-force detection behaviour."""
+
+    from app.models.detection_rule_config import DetectionRuleConfig
+
+    config = DetectionRuleConfig(
+        rule_name="BRUTE_FORCE_ATTACK",
+        display_name="Brute Force Attack",
+        description="Brute-force detection with a custom threshold.",
+        is_enabled=True,
+        parameters={
+            "failed_attempts_threshold": 10,
+        },
+    )
+
+    db_session.add(config)
+    await db_session.flush()
+
+    attempt = LoginAttempt(
+        email="engine-custom-threshold@example.com",
+        successful=False,
+        ip_address="192.0.2.50",
+    )
+
+    context = DetectionContext(
+        login_attempt=attempt,
+    )
+
+    with (
+        patch(
+            "app.services.detection.engine.rule_names",
+            ["BRUTE_FORCE_ATTACK"],
+        ),
+        patch(
+            "app.services.detection.brute_force_rule.count_failed_attempts",
+            new=AsyncMock(return_value=9),
+        ) as count_mock,
+    ):
+        results = await run_detection(
+            db_session,
+            context,
+        )
+
+    assert results == []
+
+    count_mock.assert_awaited_once_with(
+        db_session,
+        attempt.email,
+    )
+
+
+async def test_engine_persisted_brute_force_threshold_can_trigger(
+    db_session: AsyncSession,
+) -> None:
+    """The engine should trigger at a persisted brute-force threshold."""
+
+    from app.models.detection_rule_config import DetectionRuleConfig
+
+    config = DetectionRuleConfig(
+        rule_name="BRUTE_FORCE_ATTACK",
+        display_name="Brute Force Attack",
+        description="Brute-force detection with a custom threshold.",
+        is_enabled=True,
+        parameters={
+            "failed_attempts_threshold": 10,
+        },
+    )
+
+    db_session.add(config)
+    await db_session.flush()
+
+    attempt = LoginAttempt(
+        email="engine-threshold-trigger@example.com",
+        successful=False,
+        ip_address="192.0.2.51",
+    )
+
+    context = DetectionContext(
+        login_attempt=attempt,
+    )
+
+    with (
+        patch(
+            "app.services.detection.engine.rule_names",
+            ["BRUTE_FORCE_ATTACK"],
+        ),
+        patch(
+            "app.services.detection.brute_force_rule.count_failed_attempts",
+            new=AsyncMock(return_value=10),
+        ),
+    ):
+        results = await run_detection(
+            db_session,
+            context,
+        )
+
+    assert len(results) == 1
+
+    detection = results[0]
+
+    assert detection.triggered is True
+    assert detection.alert_type == "BRUTE_FORCE_ATTACK"
+    assert detection.severity == "CRITICAL"
+    assert attempt.email in detection.message

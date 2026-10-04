@@ -3,6 +3,7 @@
 from datetime import datetime
 
 from sqlalchemy import Boolean, DateTime, String
+from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.orm import Mapped, mapped_column
 
 from app.db.base import Base
@@ -42,6 +43,12 @@ class DetectionRuleConfig(Base):
     is_enabled: Mapped[bool] = mapped_column(
         Boolean,
         default=True,
+        nullable=False,
+    )
+
+    parameters: Mapped[dict[str,object]] = mapped_column(
+        JSONB,
+        default=dict,
         nullable=False,
     )
 

@@ -144,3 +144,48 @@ async def test_missing_rule_configuration_defaults_to_enabled(
         db=db_session,
         rule_name="UNSEEDED_TEST_RULE",
     ) is True
+
+
+async def test_detection_rule_config_stores_parameters(
+    db_session: AsyncSession,
+) -> None:
+    """Detection rule configuration should persist rule parameters."""
+
+    config = DetectionRuleConfig(
+        rule_name="PARAMETER_TEST_RULE",
+        display_name="Parameter Test Rule",
+        description="Rule used to test persisted parameters.",
+        is_enabled=True,
+        parameters={
+            "threshold": 10,
+            "window_minutes": 15,
+        },
+    )
+
+    db_session.add(config)
+    await db_session.flush()
+    await db_session.refresh(config)
+
+    assert config.parameters == {
+        "threshold": 10,
+        "window_minutes": 15,
+    }
+
+
+async def test_detection_rule_config_defaults_to_empty_parameters(
+    db_session: AsyncSession,
+) -> None:
+    """Rules without configurable values should receive empty parameters."""
+
+    config = DetectionRuleConfig(
+        rule_name="NO_PARAMETER_TEST_RULE",
+        display_name="No Parameter Test Rule",
+        description="Rule without configurable parameters.",
+        is_enabled=True,
+    )
+
+    db_session.add(config)
+    await db_session.flush()
+    await db_session.refresh(config)
+
+    assert config.parameters == {}

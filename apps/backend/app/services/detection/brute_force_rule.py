@@ -13,10 +13,21 @@ class BruteForceRule(DetectionRule):
 
     FAILED_ATTEMPTS_THRESHOLD = 5
 
+    def __init__(
+        self,
+        *,
+        failed_attempts_threshold: int | None = None,
+    ) -> None:
+        self.failed_attempts_threshold = (
+            failed_attempts_threshold
+            if failed_attempts_threshold is not None
+            else self.FAILED_ATTEMPTS_THRESHOLD
+        )
+
     async def evaluate(
-            self,
-            db: AsyncSession,
-            context: DetectionContext,
+        self,
+        db: AsyncSession,
+        context: DetectionContext,
     ) -> DetectionResult:
         attempt = context.login_attempt
 
@@ -24,17 +35,17 @@ class BruteForceRule(DetectionRule):
             return DetectionResult.not_triggered()
 
         email = attempt.email
-        
+
         failed_count = await count_failed_attempts(
             db,
-            email
+            email,
         )
 
-        if failed_count < self.FAILED_ATTEMPTS_THRESHOLD:
+        if failed_count < self.failed_attempts_threshold:
             return DetectionResult.not_triggered()
-        
+
         return DetectionResult.triggered_alert(
             alert_type=self.name,
             severity="CRITICAL",
-            message=f"Brute force attack detected on {email}"
+            message=f"Brute force attack detected on {email}",
         )

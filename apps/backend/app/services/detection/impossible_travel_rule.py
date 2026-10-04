@@ -11,7 +11,6 @@ from app.services.detection.base import (
 from app.services.detection.geo import haversine_distance_km
 from app.services.detection.result import DetectionResult
 
-
 class ImpossibleTravelRule(DetectionRule):
     """
     Detect successful logins whose implied travel speed is unrealistic.
@@ -24,6 +23,24 @@ class ImpossibleTravelRule(DetectionRule):
 
     MAX_TRAVEL_SPEED_KMH = 1000.0
     MIN_DISTANCE_KM = 100.0
+
+    def __init__(
+        self,
+        *,
+        max_travel_speed_kmh: float | None = None,
+        min_distance_km: float | None = None,
+    ) -> None:
+        self.max_travel_speed_kmh = (
+            max_travel_speed_kmh
+            if max_travel_speed_kmh is not None
+            else self.MAX_TRAVEL_SPEED_KMH
+        )
+
+        self.min_distance_km = (
+            min_distance_km
+            if min_distance_km is not None
+            else self.MIN_DISTANCE_KM
+        )
 
     async def evaluate(
         self,
@@ -71,7 +88,7 @@ class ImpossibleTravelRule(DetectionRule):
         )
 
         # Ignore small geographic movements.
-        if distance_km < self.MIN_DISTANCE_KM:
+        if distance_km < self.min_distance_km:
             return DetectionResult.not_triggered()
 
         elapsed_seconds = (
@@ -86,7 +103,7 @@ class ImpossibleTravelRule(DetectionRule):
 
         implied_speed_kmh = distance_km / elapsed_hours
 
-        if implied_speed_kmh <= self.MAX_TRAVEL_SPEED_KMH:
+        if implied_speed_kmh <= self.max_travel_speed_kmh:
             return DetectionResult.not_triggered()
 
         return DetectionResult.triggered_alert(
