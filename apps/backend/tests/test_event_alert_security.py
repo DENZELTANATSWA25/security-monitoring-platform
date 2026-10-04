@@ -109,3 +109,24 @@ async def test_resolving_missing_alert_returns_404(
 
     assert response.status_code == 404
     assert response.json()["detail"] == "Alert not found"
+
+
+async def test_direct_event_creation_endpoint_is_not_available(
+    viewer_client: AsyncClient,
+) -> None:
+    """
+    Security events must enter through the dedicated telemetry
+    ingestion boundary rather than the human-facing events API.
+    """
+
+    response = await viewer_client.post(
+        "/api/v1/events/",
+        json={
+            "event_type": "DIRECT_EVENT",
+            "severity": "INFO",
+            "source": "pytest",
+            "description": "Direct event creation should not be available.",
+        },
+    )
+
+    assert response.status_code == 405

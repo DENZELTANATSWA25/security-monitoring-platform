@@ -1,9 +1,7 @@
 from fastapi import APIRouter, Depends, HTTPException, Request
-from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.db.session import get_db
-from app.models.user import User, UserRole
 from app.schemas.user import (
     Token,
     UserCreate,
@@ -13,14 +11,7 @@ from app.schemas.user import (
 from app.services.audit_service import log_event
 from app.services.auth_service import login_user
 from app.services.user_service import create_user
-from app.services.login_attempt_service import (
-    record_login_attempt,
-    count_failed_attempts
-)
 
-from app.models.security_event import EventSeverity
-from app.schemas.security_event import SecurityEventCreate
-from app.services.event_service import create_event
 from app.services.location_service import resolve_ip_location
 from app.services.client_ip_service import get_client_ip
 
