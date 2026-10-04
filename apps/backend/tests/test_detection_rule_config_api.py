@@ -16,6 +16,7 @@ async def _create_detection_rule_config(
     display_name: str,
     description: str = "Detection rule used by API tests.",
     is_enabled: bool = True,
+    parameters: dict[str, object] | None = None,
 ) -> DetectionRuleConfig:
     """Create and persist a detection rule configuration for an API test."""
 
@@ -24,6 +25,7 @@ async def _create_detection_rule_config(
         display_name=display_name,
         description=description,
         is_enabled=is_enabled,
+        parameters=parameters or {},
     )
 
     db_session.add(config)
@@ -337,3 +339,239 @@ async def test_detection_rule_update_rolls_back_when_audit_fails(
     stored_config = result.scalar_one()
 
     assert stored_config.is_enabled is True
+
+
+async def test_detection_rule_response_includes_parameters(
+    admin_client: AsyncClient,
+    db_session: AsyncSession,
+) -> None:
+    """Detection rule responses should expose operational parameters."""
+
+    config = await _create_detection_rule_config(
+        db_session,
+        rule_name="EVENT_BURST",
+        display_name="Event Burst",
+        parameters={
+            "event_threshold": 10,
+            "window_minutes": 15,
+        },
+    )
+
+    response = await admin_client.get(
+        "/api/v1/detection-rules",
+    )
+
+    assert response.status_code == 200
+
+    matching_rules = [
+        item
+        for item in response.json()
+        if item["id"] == config.id
+    ]
+
+    assert len(matching_rules) == 1
+    assert matching_rules[0]["parameters"] == {
+        "event_threshold": 10,
+        "window_minutes": 15,
+    }
+
+
+async def test_admin_can_update_detection_rule_parameters(
+    admin_client: AsyncClient,
+    db_session: AsyncSession,
+) -> None:
+    """Administrators should be able to change detection parameters."""
+
+    config = await _create_detection_rule_config(
+        db_session,
+        rule_name="EVENT_BURST",
+        display_name="Event Burst",
+        parameters={
+            "event_threshold": 5,
+            "window_minutes": 5,
+        },
+    )
+
+    response = await admin_client.patch(
+        f"/api/v1/detection-rules/{config.rule_name}",
+        json={
+            "parameters": {
+                "event_threshold": 20,
+                "window_minutes": 10,
+            },
+        },
+    )
+
+    assert response.status_code == 200
+
+    body = response.json()
+
+    assert body["is_enabled"] is True
+    assert body["parameters"] == {
+        "event_threshold": 20,
+        "window_minutes": 10,
+    }
+
+    await db_session.refresh(config)
+
+    assert config.parameters == {
+        "event_threshold": 20,
+        "window_minutes": 10,
+    }
+
+
+async def test_admin_can_update_enabled_state_and_parameters_together(
+    admin_client: AsyncClient,
+    db_session: AsyncSession,
+) -> None:
+    """Enabled state and parameters should be updated atomically."""
+
+    config = await _create_detection_rule_config(
+        db_session,
+        rule_name="BRUTE_FORCE_ATTACK",
+        display_name="Brute Force",
+        is_enabled=True,
+        parameters={
+            "failed_attempts_threshold": 5,
+        },
+    )
+
+    response = await admin_client.patch(
+        f"/api/v1/detection-rules/{config.rule_name}",
+        json={
+            "is_enabled": False,
+            "parameters": {
+                "failed_attempts_threshold": 10,
+            },
+        },
+    )
+
+    assert response.status_code == 200
+
+    body = response.json()
+
+    assert body["is_enabled"] is False
+    assert body["parameters"] == {
+        "failed_attempts_threshold": 10,
+    }
+
+
+async def test_invalid_detection_rule_parameters_return_422(
+    admin_client: AsyncClient,
+    db_session: AsyncSession,
+) -> None:
+    """Invalid operational parameters should be rejected."""
+
+    config = await _create_detection_rule_config(
+        db_session,
+        rule_name="BRUTE_FORCE_ATTACK",
+        display_name="Brute Force",
+        parameters={
+            "failed_attempts_threshold": 5,
+        },
+    )
+
+    response = await admin_client.patch(
+        f"/api/v1/detection-rules/{config.rule_name}",
+        json={
+            "parameters": {
+                "failed_attempts_threshold": 0,
+            },
+        },
+    )
+
+    assert response.status_code == 422
+
+    await db_session.refresh(config)
+
+    assert config.parameters == {
+        "failed_attempts_threshold": 5,
+    }
+
+
+async def test_unknown_detection_rule_parameter_returns_422(
+    admin_client: AsyncClient,
+    db_session: AsyncSession,
+) -> None:
+    """Unknown parameters should not be silently accepted."""
+
+    config = await _create_detection_rule_config(
+        db_session,
+        rule_name="EVENT_BURST",
+        display_name="Event Burst",
+        parameters={
+            "event_threshold": 5,
+            "window_minutes": 5,
+        },
+    )
+
+    response = await admin_client.patch(
+        f"/api/v1/detection-rules/{config.rule_name}",
+        json={
+            "parameters": {
+                "event_threshold": 10,
+                "window_minutes": 5,
+                "unknown_parameter": 123,
+            },
+        },
+    )
+
+    assert response.status_code == 422
+
+async def test_parameter_update_rolls_back_when_audit_fails(
+    admin_client: AsyncClient,
+    db_session: AsyncSession,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Parameter changes must roll back when audit logging fails."""
+
+    original_parameters = {
+        "event_threshold": 5,
+        "window_minutes": 5,
+    }
+
+    config = await _create_detection_rule_config(
+        db_session,
+        rule_name="EVENT_BURST",
+        display_name="Event Burst",
+        is_enabled=True,
+        parameters=original_parameters,
+    )
+
+    config_id = config.id
+
+    async def failing_log_event(*args, **kwargs):
+        raise RuntimeError("Simulated audit failure")
+
+    monkeypatch.setattr(
+        "app.api.v1.endpoints.detection_rules.log_event",
+        failing_log_event,
+    )
+
+    with pytest.raises(
+        RuntimeError,
+        match="Simulated audit failure",
+    ):
+        await admin_client.patch(
+            f"/api/v1/detection-rules/{config.rule_name}",
+            json={
+                "is_enabled": False,
+                "parameters": {
+                    "event_threshold": 50,
+                    "window_minutes": 30,
+                },
+            },
+        )
+
+    await db_session.rollback()
+
+    result = await db_session.execute(
+        select(DetectionRuleConfig).where(
+            DetectionRuleConfig.id == config_id,
+        )
+    )
+
+    stored_config = result.scalar_one()
+
+    assert stored_config.is_enabled is True
+    assert stored_config.parameters == original_parameters

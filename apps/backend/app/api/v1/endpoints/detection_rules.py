@@ -1,6 +1,7 @@
 """Administrative endpoints for managing detection rule configuration."""
 
 from fastapi import APIRouter, Depends, HTTPException, status
+from pydantic import ValidationError
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.permissions import require_role
@@ -14,7 +15,7 @@ from app.services.audit_service import log_event
 from app.services.detection_rule_config_service import (
     get_detection_rule_config_by_name,
     get_detection_rule_configs,
-    set_detection_rule_enabled,
+    update_detection_rule_config,
 )
 
 
@@ -51,7 +52,7 @@ async def update_detection_rule(
         require_role(UserRole.ADMIN),
     ),
 ):
-    """Enable or disable a registered detection rule."""
+    """Update operational configuration for a registered detection rule."""
 
     config = await get_detection_rule_config_by_name(
         db=db,
@@ -64,13 +65,15 @@ async def update_detection_rule(
             detail="Detection rule not found",
         )
 
-    previous_state = config.is_enabled
+    previous_enabled_state = config.is_enabled
+    previous_parameters = dict(config.parameters)
 
     try:
-        config = await set_detection_rule_enabled(
+        config = await update_detection_rule_config(
             db=db,
             config=config,
             is_enabled=payload.is_enabled,
+            parameters=payload.parameters,
         )
 
         await log_event(
@@ -80,14 +83,27 @@ async def update_detection_rule(
             user_id=current_user.id,
             details=(
                 f"Changed detection rule '{config.rule_name}' "
-                f"enabled state from {previous_state} "
-                f"to {config.is_enabled}"
+                f"enabled state from {previous_enabled_state} "
+                f"to {config.is_enabled}; "
+                f"parameters from {previous_parameters} "
+                f"to {config.parameters}"
             ),
         )
 
         # Configuration change and audit record become permanent together.
         await db.commit()
         await db.refresh(config)
+
+    except ValidationError as exc:
+        await db.rollback()
+
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail=exc.errors(
+                include_url=False,
+                include_context=False,
+            ),
+        ) from exc
 
     except Exception:
         await db.rollback()

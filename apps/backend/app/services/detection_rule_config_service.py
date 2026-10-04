@@ -1,10 +1,13 @@
 """Service layer for detection rule configuration."""
 
+from collections.abc import Mapping
+from typing import Any
+
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models.detection_rule_config import DetectionRuleConfig
-
+from app.services.detection.factory import build_detection_rule
 
 async def get_detection_rule_configs(
     db: AsyncSession,
@@ -49,6 +52,38 @@ async def set_detection_rule_enabled(
     """
 
     config.is_enabled = is_enabled
+
+    await db.flush()
+    await db.refresh(config)
+
+    return config
+
+async def update_detection_rule_config(
+    db: AsyncSession,
+    config: DetectionRuleConfig,
+    *,
+    is_enabled: bool | None = None,
+    parameters: Mapping[str, Any] | None = None,
+) -> DetectionRuleConfig:
+    """
+    Apply validated operational configuration changes to a detection rule.
+
+    Transaction ownership remains with the calling workflow so the
+    configuration change and its audit record can be committed atomically.
+    """
+
+    if is_enabled is not None:
+        config.is_enabled = is_enabled
+
+    if parameters is not None:
+        # Constructing the rule validates the supplied persisted parameters
+        # using the rule-specific Pydantic parameter schema.
+        build_detection_rule(
+            config.rule_name,
+            parameters,
+        )
+
+        config.parameters = dict(parameters)
 
     await db.flush()
     await db.refresh(config)

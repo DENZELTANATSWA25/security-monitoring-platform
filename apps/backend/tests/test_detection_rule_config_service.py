@@ -8,7 +8,11 @@ from app.services.detection_rule_config_service import (
     get_detection_rule_configs,
     is_detection_rule_enabled,
     set_detection_rule_enabled,
+    update_detection_rule_config,
 )
+
+import pytest
+from pydantic import ValidationError
 
 
 async def test_get_detection_rule_config_by_name(
@@ -189,3 +193,133 @@ async def test_detection_rule_config_defaults_to_empty_parameters(
     await db_session.refresh(config)
 
     assert config.parameters == {}
+
+async def test_update_detection_rule_config_updates_enabled_state_and_parameters(
+    db_session: AsyncSession,
+) -> None:
+    """Configuration updates should persist enabled state and parameters."""
+
+    config = DetectionRuleConfig(
+        rule_name="EVENT_BURST",
+        display_name="Event Burst",
+        description="Detect frequent security events.",
+        is_enabled=True,
+        parameters={
+            "event_threshold": 5,
+            "window_minutes": 5,
+        },
+    )
+
+    db_session.add(config)
+    await db_session.flush()
+
+    updated = await update_detection_rule_config(
+        db=db_session,
+        config=config,
+        is_enabled=False,
+        parameters={
+            "event_threshold": 20,
+            "window_minutes": 10,
+        },
+    )
+
+    assert updated.is_enabled is False
+    assert updated.parameters == {
+        "event_threshold": 20,
+        "window_minutes": 10,
+    }
+
+
+async def test_update_detection_rule_config_can_update_only_enabled_state(
+    db_session: AsyncSession,
+) -> None:
+    """Omitted parameters should leave existing parameters unchanged."""
+
+    parameters = {
+        "event_threshold": 10,
+        "window_minutes": 15,
+    }
+
+    config = DetectionRuleConfig(
+        rule_name="EVENT_BURST",
+        display_name="Event Burst",
+        description="Detect frequent security events.",
+        is_enabled=True,
+        parameters=parameters,
+    )
+
+    db_session.add(config)
+    await db_session.flush()
+
+    updated = await update_detection_rule_config(
+        db=db_session,
+        config=config,
+        is_enabled=False,
+    )
+
+    assert updated.is_enabled is False
+    assert updated.parameters == parameters
+
+
+async def test_update_detection_rule_config_can_update_only_parameters(
+    db_session: AsyncSession,
+) -> None:
+    """Omitted enabled state should leave the current state unchanged."""
+
+    config = DetectionRuleConfig(
+        rule_name="BRUTE_FORCE_ATTACK",
+        display_name="Brute Force",
+        description="Detect repeated failed authentication attempts.",
+        is_enabled=True,
+        parameters={
+            "failed_attempts_threshold": 5,
+        },
+    )
+
+    db_session.add(config)
+    await db_session.flush()
+
+    updated = await update_detection_rule_config(
+        db=db_session,
+        config=config,
+        parameters={
+            "failed_attempts_threshold": 10,
+        },
+    )
+
+    assert updated.is_enabled is True
+    assert updated.parameters == {
+        "failed_attempts_threshold": 10,
+    }
+
+
+async def test_update_detection_rule_config_rejects_invalid_parameters(
+    db_session: AsyncSession,
+) -> None:
+    """Invalid rule parameters must not be persisted."""
+
+    original_parameters = {
+        "failed_attempts_threshold": 5,
+    }
+
+    config = DetectionRuleConfig(
+        rule_name="BRUTE_FORCE_ATTACK",
+        display_name="Brute Force",
+        description="Detect repeated failed authentication attempts.",
+        is_enabled=True,
+        parameters=original_parameters,
+    )
+
+    db_session.add(config)
+    await db_session.flush()
+
+    with pytest.raises(ValidationError):
+        await update_detection_rule_config(
+            db=db_session,
+            config=config,
+            parameters={
+                "failed_attempts_threshold": 0,
+            },
+        )
+
+    assert config.parameters == original_parameters
