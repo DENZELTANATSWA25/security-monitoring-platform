@@ -2,9 +2,7 @@ from fastapi import APIRouter, Depends, HTTPException, Request
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.core.permissions import require_role
 from app.db.session import get_db
-from app.models.audit_log import AuditLog
 from app.models.user import User, UserRole
 from app.schemas.user import (
     Token,
@@ -90,15 +88,3 @@ async def login(
             status_code=401,
             detail=str(e),
         )
-
-
-@router.get("/audit")
-async def get_audit_logs(
-    db: AsyncSession = Depends(get_db),
-    _: User = Depends(require_role(UserRole.ADMIN)),
-):
-    result = await db.execute(
-        select(AuditLog).order_by(AuditLog.timestamp.desc())
-    )
-
-    return result.scalars().all()

@@ -141,54 +141,6 @@ async def test_wrong_password_is_rejected(
     assert response.json()["detail"] == "Invalid email or password"
 
 
-async def test_missing_token_is_rejected(
-    client: AsyncClient,
-) -> None:
-    """A protected endpoint should reject an unauthenticated request."""
-
-    response = await client.get(
-        "/api/v1/auth/audit",
-    )
-
-    assert response.status_code == 401
-
-
-async def test_admin_can_access_admin_endpoint(
-    admin_client: AsyncClient,
-) -> None:
-    """Administrators should be allowed to access the audit endpoint."""
-
-    response = await admin_client.get(
-        "/api/v1/auth/audit",
-    )
-
-    assert response.status_code == 200
-
-
-async def test_analyst_cannot_access_admin_endpoint(
-    analyst_client: AsyncClient,
-) -> None:
-    """Analysts should not have administrator-only access."""
-
-    response = await analyst_client.get(
-        "/api/v1/auth/audit",
-    )
-
-    assert response.status_code == 403
-
-
-async def test_viewer_cannot_access_admin_endpoint(
-    viewer_client: AsyncClient,
-) -> None:
-    """Viewers should not have administrator-only access."""
-
-    response = await viewer_client.get(
-        "/api/v1/auth/audit",
-    )
-
-    assert response.status_code == 403
-
-
 async def test_login_ignores_forwarded_ip_from_untrusted_peer(
     client: AsyncClient,
     viewer_user: User,
