@@ -1,5 +1,7 @@
-from sqlalchemy import select
+from sqlalchemy import asc, desc, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
+
+from datetime import datetime
 
 from app.models.incident import (
     Incident,
@@ -103,14 +105,81 @@ async def create_incident(
 
 async def get_incidents(
     db: AsyncSession,
+    *,
+    limit: int = 50,
+    offset: int = 0,
+    status: IncidentStatus | None = None,
+    severity: str | None = None,
+    assigned_user_id: int | None = None,
+    unassigned: bool | None = None,
+    start_date: datetime | None = None,
+    end_date: datetime | None = None,
+    search: str | None = None,
+    sort_order: str = "desc",
 ) -> list[Incident]:
-    """Return incidents ordered from newest to oldest."""
+    """Return filtered and paginated incidents."""
 
-    result = await db.execute(
-        select(Incident).order_by(
-            Incident.created_at.desc(),
+    query = select(Incident)
+
+    if status is not None:
+        query = query.where(
+            Incident.status == status
         )
+
+    if severity is not None:
+        query = query.where(
+            Incident.severity == severity
+        )
+
+    if assigned_user_id is not None:
+        query = query.where(
+            Incident.assigned_user_id == assigned_user_id
+        )
+
+    if unassigned is True:
+        query = query.where(
+            Incident.assigned_user_id.is_(None)
+        )
+
+    if start_date is not None:
+        query = query.where(
+            Incident.created_at >= start_date
+        )
+
+    if end_date is not None:
+        query = query.where(
+            Incident.created_at <= end_date
+        )
+
+    if search:
+        search_term = f"%{search.strip()}%"
+
+        query = query.where(
+            or_(
+                Incident.title.ilike(search_term),
+                Incident.description.ilike(search_term),
+                Incident.severity.ilike(search_term),
+                Incident.assigned_to.ilike(search_term),
+            )
+        )
+
+    order_function = (
+        asc
+        if sort_order == "asc"
+        else desc
     )
+
+    query = (
+        query
+        .order_by(
+            order_function(Incident.created_at),
+            order_function(Incident.id),
+        )
+        .offset(offset)
+        .limit(limit)
+    )
+
+    result = await db.execute(query)
 
     return list(result.scalars().all())
 

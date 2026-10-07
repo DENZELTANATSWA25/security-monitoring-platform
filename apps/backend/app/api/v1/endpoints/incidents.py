@@ -1,7 +1,11 @@
+from datetime import datetime
+
+from typing import Literal
 from fastapi import (
     APIRouter,
     Depends,
     HTTPException,
+    Query,
 )
 from fastapi import status as http_status
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -114,11 +118,52 @@ async def create(
     response_model=list[IncidentResponse],
 )
 async def list_incidents(
+    limit: int = Query(
+        default=50,
+        ge=1,
+        le=100,
+    ),
+    offset: int = Query(
+        default=0,
+        ge=0,
+    ),
+    status: IncidentStatus | None = None,
+    severity: str | None = Query(
+        default=None,
+        min_length=1,
+        max_length=50,
+    ),
+    assigned_user_id: int | None = Query(
+        default=None,
+        ge=1,
+    ),
+    unassigned: bool | None = None,
+    start_date: datetime | None = None,
+    end_date: datetime | None = None,
+    search: str | None = Query(
+        default=None,
+        min_length=1,
+        max_length=200,
+    ),
+    sort_order: Literal["asc", "desc"] = "desc",
     db: AsyncSession = Depends(get_db),
     _: User = Depends(get_current_user),
 ):
-    """Return all incidents."""
-    return await get_incidents(db)
+    """Return filtered and paginated incidents."""
+
+    return await get_incidents(
+        db,
+        limit=limit,
+        offset=offset,
+        status=status,
+        severity=severity,
+        assigned_user_id=assigned_user_id,
+        unassigned=unassigned,
+        start_date=start_date,
+        end_date=end_date,
+        search=search,
+        sort_order=sort_order,
+    )
 
 
 @router.get(
