@@ -32,6 +32,7 @@ from app.services.user_service import (
     update_user_verification,
 )
 
+from app.services.audit_service import log_event
 
 router = APIRouter(
     prefix="/users",
@@ -133,6 +134,20 @@ async def change_user_role(
             detail="User not found",
         )
 
+    await log_event(
+        db=db,
+        action="USER_ROLE_CHANGED",
+        resource="USER",
+        user_id=current_user.id,
+        details=(
+            f"Changed user {user.id} role to "
+            f"{payload.role.value}"
+        ),
+    )
+
+    await db.commit()
+    await db.refresh(user)
+
     return user
 
 
@@ -166,6 +181,20 @@ async def change_user_status(
             detail="User not found",
         )
 
+    await log_event(
+        db=db,
+        action="USER_STATUS_CHANGED",
+        resource="USER",
+        user_id=current_user.id,
+        details=(
+            f"Changed user {user.id} active status to "
+            f"{payload.is_active}"
+        ),
+    )
+
+    await db.commit()
+    await db.refresh(user)
+
     return user
 
 
@@ -177,7 +206,7 @@ async def change_user_verification(
     user_id: int,
     payload: UserVerificationUpdate,
     db: AsyncSession = Depends(get_db),
-    _: User = Depends(
+    current_user: User = Depends(
         require_role(UserRole.ADMIN)
     ),
 ):
@@ -192,5 +221,19 @@ async def change_user_verification(
             status_code=404,
             detail="User not found",
         )
+
+    await log_event(
+        db=db,
+        action="USER_VERIFICATION_CHANGED",
+        resource="USER",
+        user_id=current_user.id,
+        details=(
+            f"Changed user {user.id} verification status to "
+            f"{payload.is_verified}"
+        ),
+    )
+
+    await db.commit()
+    await db.refresh(user)
 
     return user

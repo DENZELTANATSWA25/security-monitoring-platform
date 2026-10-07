@@ -78,7 +78,7 @@ async def get_assignable_users(
 ):
     """
     Return active users who are allowed to own incidents.
-    
+
     Only admins and analysts can be assigned.
     """
     result = await db.execute(
@@ -112,8 +112,7 @@ async def update_user_role(
 
     user.role = role
 
-    await db.commit()
-    await db.refresh(user)
+    await db.flush()
 
     return user
 
@@ -132,8 +131,7 @@ async def update_user_status(
 
     user.is_active = is_active
 
-    await db.commit()
-    await db.refresh(user)
+    await db.flush()
 
     return user
 
@@ -152,7 +150,6 @@ async def update_user_verification(
 
     user.is_verified = is_verified
 
-    await db.commit()
-    await db.refresh(user)
+    await db.flush()
 
     return user
