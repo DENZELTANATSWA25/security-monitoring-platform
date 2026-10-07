@@ -1,6 +1,8 @@
 """Service layer for application audit logging."""
 
-from sqlalchemy import select
+from datetime import datetime
+
+from sqlalchemy import asc, desc, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models.audit_log import AuditLog
@@ -38,17 +40,70 @@ async def get_audit_logs(
     *,
     limit: int = 50,
     offset: int = 0,
+    user_id: int | None = None,
+    action: str | None = None,
+    resource: str | None = None,
+    start_date: datetime | None = None,
+    end_date: datetime | None = None,
+    search: str | None = None,
+    sort_order: str = "desc",
 ) -> list[AuditLog]:
-    """Return audit logs in reverse chronological order."""
+    """Return filtered and paginated audit logs."""
 
-    result = await db.execute(
-        select(AuditLog)
+    query = select(AuditLog)
+
+    if user_id is not None:
+        query = query.where(
+            AuditLog.user_id == user_id
+        )
+
+    if action is not None:
+        query = query.where(
+            AuditLog.action == action
+        )
+
+    if resource is not None:
+        query = query.where(
+            AuditLog.resource == resource
+        )
+
+    if start_date is not None:
+        query = query.where(
+            AuditLog.timestamp >= start_date
+        )
+
+    if end_date is not None:
+        query = query.where(
+            AuditLog.timestamp <= end_date
+        )
+
+    if search:
+        search_term = f"%{search.strip()}%"
+
+        query = query.where(
+            or_(
+                AuditLog.action.ilike(search_term),
+                AuditLog.resource.ilike(search_term),
+                AuditLog.details.ilike(search_term),
+            )
+        )
+
+    order_function = (
+        asc
+        if sort_order == "asc"
+        else desc
+    )
+
+    query = (
+        query
         .order_by(
-            AuditLog.timestamp.desc(),
-            AuditLog.id.desc(),
+            order_function(AuditLog.timestamp),
+            order_function(AuditLog.id),
         )
         .offset(offset)
         .limit(limit)
     )
+
+    result = await db.execute(query)
 
     return list(result.scalars().all())
