@@ -1,4 +1,4 @@
-"""Model congiguration for anomaly detection."""
+"""Model configuration for anomaly detection."""
 
 from dataclasses import dataclass
 
