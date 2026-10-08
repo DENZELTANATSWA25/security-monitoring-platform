@@ -2,6 +2,7 @@
 
 import { useEffect } from "react";
 import { useQueryClient } from "@tanstack/react-query";
+import { getAccessToken } from "@/lib/auth";
 
 export function useLiveEvents() {
     const queryClient = useQueryClient();
@@ -12,8 +13,23 @@ export function useLiveEvents() {
         let manuallyClosed = false;
 
         function connect() {
-            socket = new WebSocket(
+            const token = getAccessToken();
+
+            if (!token) {
+                return;
+            }
+
+            const websocketUrl = new URL(
                 "ws://localhost:8000/ws/events"
+            );
+
+            websocketUrl.searchParams.set(
+                "token",
+                token
+            );
+
+            socket = new WebSocket(
+                websocketUrl.toString()
             );
 
             socket.onopen = () => {
@@ -48,8 +64,15 @@ export function useLiveEvents() {
                 }
             };
 
-            socket.onclose = () => {
+            socket.onclose = (event) => {
                 if (manuallyClosed) {
+                    return;
+                }
+
+                if (event.code === 1008) {
+                    console.warn(
+                        "Websocket authentication was rejected"
+                    );
                     return;
                 }
 
