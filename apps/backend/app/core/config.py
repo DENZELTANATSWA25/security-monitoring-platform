@@ -26,6 +26,9 @@ class Settings(BaseSettings):
     # Telemetry source health monitoring.
     TELEMETRY_SOURCE_ONLINE_THRESHOLD_SECONDS: int = 300
 
+    # ML anomaly-detection model artifacrs.
+    ANOMALY_MODEL_DIRECTORY: str = "models/anomaly_detection"
+
     # Pydantic Settings v2 configuration.
     model_config = SettingsConfigDict(
         env_file=".env",

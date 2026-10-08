@@ -12,6 +12,7 @@ from app.schemas.security_event import SecurityEventCreate
 from app.services.event_service import create_event
 from app.models.alert import Alert
 from app.services.detection.result import DetectionResult
+from app.services.anomaly_detection.result import AnomalyResult
 
 
 async def test_event_can_be_created_without_metadata(
@@ -380,3 +381,137 @@ async def test_identical_events_are_stored_as_distinct_occurrences(
     events = result.scalars().all()
 
     assert len(events) == 2
+
+async def test_event_creation_continues_when_anomaly_detection_is_unavailable(
+    db_session: AsyncSession,
+) -> None:
+    """Unavailable ML detection must not prevent event ingestion."""
+
+    event_type = "ML_UNAVAILABLE_INTEGRATION_TEST"
+
+    event_data = SecurityEventCreate(
+        event_type=event_type,
+        severity=EventSeverity.INFO,
+        source="pytest-ml",
+        description="Event created while ML detection is unavailable.",
+    )
+
+    with patch(
+        "app.services.event_service.detect_anomaly",
+        return_value=AnomalyResult.unavailable(
+            reason="No trained anomaly model is available.",
+        ),
+    ):
+        event = await create_event(
+            db=db_session,
+            event_data=event_data,
+        )
+
+    assert event.id is not None
+
+    result = await db_session.execute(
+        select(SecurityEvent).where(
+            SecurityEvent.id == event.id,
+        )
+    )
+
+    persisted_event = result.scalar_one_or_none()
+
+    assert persisted_event is not None
+    assert persisted_event.event_type == event_type
+
+    alert_result = await db_session.execute(
+        select(Alert).where(
+            Alert.alert_type == "ML_ANOMALY",
+        )
+    )
+
+    ml_alert = alert_result.scalar_one_or_none()
+
+    assert ml_alert is None
+
+
+async def test_normal_ml_result_does_not_create_anomaly_alert(
+    db_session: AsyncSession,
+) -> None:
+    """A normal ML classification must not generate an anomaly alert."""
+
+    event_data = SecurityEventCreate(
+        event_type="ML_NORMAL_INTEGRATION_TEST",
+        severity=EventSeverity.INFO,
+        source="pytest-ml",
+        description="Event classified as normal by ML.",
+    )
+
+    with patch(
+        "app.services.event_service.detect_anomaly",
+        return_value=AnomalyResult.normal(
+            score=0.123456,
+            model_version="v1",
+        ),
+    ):
+        event = await create_event(
+            db=db_session,
+            event_data=event_data,
+        )
+
+    assert event.id is not None
+
+    result = await db_session.execute(
+        select(Alert).where(
+            Alert.alert_type == "ML_ANOMALY",
+        )
+    )
+
+    ml_alert = result.scalar_one_or_none()
+
+    assert ml_alert is None
+
+
+async def test_anomalous_ml_result_creates_anomaly_alert(
+    db_session: AsyncSession,
+) -> None:
+    """An anomalous ML classification should generate an ML alert."""
+
+    event_data = SecurityEventCreate(
+        event_type="ML_ANOMALY_INTEGRATION_TEST",
+        severity=EventSeverity.WARNING,
+        source="pytest-ml",
+        description="Event classified as anomalous by ML.",
+    )
+
+    with patch(
+        "app.services.event_service.detect_anomaly",
+        return_value=AnomalyResult.anomalous(
+            score=-0.314159,
+            model_version="v1",
+            reason=(
+                "Event behaviour differs from the model's "
+                "learned baseline."
+            ),
+        ),
+    ):
+        event = await create_event(
+            db=db_session,
+            event_data=event_data,
+        )
+
+    assert event.id is not None
+
+    result = await db_session.execute(
+        select(Alert).where(
+            Alert.alert_type == "ML_ANOMALY",
+        )
+    )
+
+    ml_alert = result.scalar_one_or_none()
+
+    assert ml_alert is not None
+    assert ml_alert.severity == "WARNING"
+    assert f"security event {event.id}" in ml_alert.message
+    assert "Model: v1" in ml_alert.message
+    assert "Score: -0.314159" in ml_alert.message
+    assert (
+        "Event behaviour differs from the model's learned baseline."
+        in ml_alert.message
+    )

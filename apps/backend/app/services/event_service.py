@@ -1,5 +1,6 @@
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
+from pathlib import Path
 
 from app.core.websocket_manager import manager
 from app.models.security_event import SecurityEvent
@@ -7,6 +8,8 @@ from app.schemas.security_event import SecurityEventCreate
 from app.services.alert_service import create_alert
 from app.services.detection.engine import run_detection
 from app.services.detection.base import DetectionContext
+from app.core.config import settings
+from app.services.anomaly_detection.detector import detect_anomaly
 
 
 async def create_event(
@@ -55,6 +58,28 @@ async def create_event(
                 alert_type=result.alert_type,
                 severity=result.severity,
                 message=result.message,
+            )
+
+        # Run ML anomaly detection independently from deterministic rules.
+        anomaly_result = detect_anomaly(
+            event,
+            model_directory=Path(
+                settings.ANOMALY_MODEL_DIRECTORY
+            ),
+        )
+
+        if anomaly_result.available and anomaly_result.is_anomaly:
+            await create_alert(
+                db=db,
+                alert_type="ML_ANOMALY",
+                severity="WARNING",
+                message=(
+                    "ML anomaly detected for security event "
+                    f"{event.id}. "
+                    f"Model: {anomaly_result.model_version}. "
+                    f"Score: {anomaly_result.score:.6f}. "
+                    f"{anomaly_result.reason}"
+                ),
             )
 
         # Event and generated alerts become permanent together.
