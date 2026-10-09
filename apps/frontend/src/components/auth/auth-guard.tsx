@@ -1,61 +1,58 @@
 "use client";
 
-import { useEffect } from "react";
+import { useEffect, useSyncExternalStore } from "react";
 import { useRouter } from "next/navigation";
 
 import { DEV_AUTH_BYPASS } from "@/lib/auth-config";
 import { useCurrentUser } from "@/hooks/use-users";
-import { getAccessToken } from "@/lib/auth";
 
-export default function AuthGuard({
-    children,
-}: {
-    children: React.ReactNode;
-}) {
-    const router = useRouter();
+import {
+  getAuthSnapshot,
+  getServerAuthSnapshot,
+  subscribeToAuth,
+} from "@/lib/auth";
 
-    const token = getAccessToken();
+export default function AuthGuard({ children }: { children: React.ReactNode }) {
+  const router = useRouter();
 
-    const {
-        data: currentUser,
-        isLoading,
-    } = useCurrentUser();
+  const isAuthenticated = useSyncExternalStore(
+    subscribeToAuth,
+    getAuthSnapshot,
+    getServerAuthSnapshot,
+  );
 
-    useEffect(() => {
-        if (DEV_AUTH_BYPASS) {
-            return;
-        }
+  const { data: currentUser, isLoading, isError } = useCurrentUser();
 
-        if (!token) {
-            router.replace("/login");
-            return;
-        }
-
-        if (!isLoading && !currentUser) {
-            router.replace("/login");
-        }
-    }, [
-        token,
-        isLoading,
-        currentUser,
-        router,
-    ]);
-
+  useEffect(() => {
     if (DEV_AUTH_BYPASS) {
-        return children;
+      return;
     }
 
-    if (!token || isLoading) {
-        return (
-            <div className="min-h-screen flex items-center justify-center">
-                Checking authentication
-            </div>
-        );
+    if (!isAuthenticated) {
+      router.replace("/login");
+      return;
     }
 
-    if (!currentUser) {
-        return null;
+    if (!isLoading && (isError || !currentUser)) {
+      router.replace("/login");
     }
+  }, [isAuthenticated, isLoading, isError, currentUser, router]);
 
+  if (DEV_AUTH_BYPASS) {
     return children;
-}    
+  }
+
+  if (!isAuthenticated || isLoading) {
+    return (
+      <div className="flex min-h-screen items-center justify-center">
+        Checking authentication
+      </div>
+    );
+  }
+
+  if (isError || !currentUser) {
+    return null;
+  }
+
+  return children;
+}

@@ -7,117 +7,76 @@ import { login } from "@/services/auth.service";
 
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import {
-    Card,
-    CardContent,
-    CardHeader,
-    CardTitle,
-} from "@/components/ui/card";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 
+import { useQueryClient } from "@tanstack/react-query";
 
 export default function LoginPage() {
-    const router = useRouter();
+  const router = useRouter();
+  const queryClient = useQueryClient();
 
-    const [email, setEmail] = useState("");
-    const [password, setPassword] = useState("");
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
 
-    const [isSubmitting, setIsSubmitting] =
-        useState(false);
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
-    const [error, setError] =
-        useState<string | null>(null);
+  const [error, setError] = useState<string | null>(null);
 
+  async function handleSubmit(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
 
-    async function handleSubmit(
-        event: FormEvent<HTMLFormElement>
-    ) {
-        event.preventDefault();
+    setError(null);
 
-        setError(null);
+    try {
+      setIsSubmitting(true);
 
-        try {
-            setIsSubmitting(true);
+      await login({
+        email,
+        password,
+      });
 
-            await login({
-                email,
-                password,
-            });
-
-            router.push("/");
-
-        } catch {
-            setError(
-                "Invalid email or password."
-            );
-
-        } finally {
-            setIsSubmitting(false);
-        }
+      queryClient.clear();
+      router.replace("/");
+    } catch {
+      setError("Invalid email or password.");
+    } finally {
+      setIsSubmitting(false);
     }
+  }
 
+  return (
+    <div className="min-h-screen flex items-center justify-center bg-slate-100">
+      <Card className="w-full max-w-md">
+        <CardHeader>
+          <CardTitle>Security SOC Login</CardTitle>
+        </CardHeader>
 
-    return (
-        <div className="min-h-screen flex items-center justify-center bg-slate-100">
+        <CardContent>
+          <form onSubmit={handleSubmit} className="space-y-4">
+            <Input
+              type="email"
+              placeholder="Email"
+              value={email}
+              onChange={(event) => setEmail(event.target.value)}
+              required
+            />
 
-            <Card className="w-full max-w-md">
+            <Input
+              type="password"
+              placeholder="Password"
+              value={password}
+              onChange={(event) => setPassword(event.target.value)}
+              required
+            />
 
-                <CardHeader>
+            {error && <p className="text-sm text-red-600">{error}</p>}
 
-                    <CardTitle>
-                        Security SOC Login
-                    </CardTitle>
-
-                </CardHeader>
-
-                <CardContent>
-
-                    <form
-                        onSubmit={handleSubmit}
-                        className="space-y-4"
-                    >
-
-                        <Input
-                            type="email"
-                            placeholder="Email"
-                            value={email}
-                            onChange={(event) =>
-                                setEmail(event.target.value)
-                            }
-                            required
-                        />
-
-                        <Input
-                            type="password"
-                            placeholder="Password"
-                            value={password}
-                            onChange={(event) =>
-                                setPassword(event.target.value)
-                            }
-                            required
-                        />
-
-                        {error && (
-                            <p className="text-sm text-red-600">
-                                {error}
-                            </p>
-                        )}
-
-                        <Button
-                            type="submit"
-                            className="w-full"
-                            disabled={isSubmitting}
-                        >
-                            {isSubmitting
-                                ? "Signing in..."
-                                : "Sign in"}
-                        </Button>
-
-                    </form>
-
-                </CardContent>
-
-            </Card>
-
-        </div>
-    );
+            <Button type="submit" className="w-full" disabled={isSubmitting}>
+              {isSubmitting ? "Signing in..." : "Sign in"}
+            </Button>
+          </form>
+        </CardContent>
+      </Card>
+    </div>
+  );
 }

@@ -20,7 +20,8 @@ export function useLiveEvents() {
             }
 
             const websocketUrl = new URL(
-                "ws://localhost:8000/ws/events"
+                process.env.NEXT_PUBLIC_WS_URL ??
+                    "ws://localhost:8000/ws/events"
             );
 
             websocketUrl.searchParams.set(
