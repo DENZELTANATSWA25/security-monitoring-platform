@@ -1,5 +1,10 @@
-from fastapi import FastAPI
+import logging
+
+from fastapi import Depends, FastAPI, HTTPException, status
 from fastapi.middleware.cors import CORSMiddleware
+from redis.asyncio import Redis
+from sqlalchemy import text
+from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.api.v1.endpoints import (
     auth,
@@ -18,6 +23,14 @@ from app.api.v1.endpoints import (
 )
 
 from app.core.config import settings
+from app.core.logging import configure_logging
+from app.core.redis import get_redis
+from app.db.session import get_db
+
+
+configure_logging()
+
+logger = logging.getLogger(__name__)
 
 app = FastAPI(
     title=settings.APP_NAME
@@ -87,9 +100,46 @@ app.include_router(
 )
 
 @app.get("/")
-async def health_check():
+async def root() -> dict[str, str]:
+    """Return basic application information."""
+
     return {
         "status": "ok",
         "environment": settings.APP_ENV,
         "message": "Backend is running"
+    }
+
+@app.get("/health")
+async def health_check() -> dict[str, str]:
+    """Report whether the application process is alive."""
+    return {
+        "status": "ok",
+    }
+
+@app.get("/ready")
+async def readiness_check(
+    db: AsyncSession = Depends(get_db),
+    redis: Redis = Depends(get_redis),
+) -> dict[str, str]:
+    """Report whether required infrastructure is reachable."""
+
+    try:
+        await db.execute(
+            text("SELECT 1")
+        )
+        await redis.ping()
+    except Exception:
+        logger.exception(
+            "Application readiness check failed"
+        )
+
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail="Service is not ready",
+        ) from None
+
+    return {
+        "status": "ready",
+        "database": "ok",
+        "redis": "ok",
     }
