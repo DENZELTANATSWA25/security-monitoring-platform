@@ -13,6 +13,12 @@ class Settings(BaseSettings):
     JWT_SECRET_KEY: str
     JWT_ALGORITHM: str = "HS256"
     JWT_EXPIRE_MINUTES: int = 60
+
+    #Interactive login abuse protection
+    LOGIN_RATE_LIMIT_PER_EMAIL: int = 10
+    LOGIN_RATE_LIMIT_PER_IP: int = 30
+    LOGIN_RATE_LIMIT_WINDOW_SECONDS: int = 300
+
     GEOIP_DATABASE_PATH: str | None = None
     TRUSTED_PROXY_IPS: str = ""
 

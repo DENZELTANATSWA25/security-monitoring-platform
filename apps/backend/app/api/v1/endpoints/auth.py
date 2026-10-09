@@ -14,6 +14,7 @@ from app.services.user_service import create_user
 
 from app.services.location_service import resolve_ip_location
 from app.services.client_ip_service import get_client_ip
+from app.core.login_rate_limit import require_login_rate_limit
 
 router = APIRouter(
     prefix="/auth",
@@ -54,6 +55,9 @@ async def register_user(
 @router.post(
     "/login",
     response_model=Token,
+    dependencies=[
+        Depends(require_login_rate_limit)
+    ],
 )
 async def login(
     request: Request,

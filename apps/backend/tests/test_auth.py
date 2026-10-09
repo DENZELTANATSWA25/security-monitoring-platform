@@ -222,3 +222,51 @@ async def test_login_accepts_forwarded_ip_from_trusted_proxy(
     attempt = result.scalar_one()
 
     assert attempt.ip_address == "8.8.8.8"
+
+async def test_protected_route_rejects_token_without_subject(
+    client: AsyncClient,
+) -> None:
+    """A JWT without a subject must be rejected cleanly."""
+
+    from app.core.security import create_access_token
+
+    token = create_access_token(
+        {
+            "role": "viewer",
+        }
+    )
+
+    response = await client.get(
+        "/api/v1/events/",
+        headers={
+            "Authorization": f"Bearer {token}",
+        },
+    )
+
+    assert response.status_code == 401
+    assert response.json()["detail"] == "Invalid token"
+
+
+async def test_protected_route_rejects_nonnumeric_subject(
+    client: AsyncClient,
+) -> None:
+    """A malformed JWT subject must return 401 rather than causing a 500."""
+
+    from app.core.security import create_access_token
+
+    token = create_access_token(
+        {
+            "sub": "not-a-user-id",
+            "role": "viewer",
+        }
+    )
+
+    response = await client.get(
+        "/api/v1/events/",
+        headers={
+            "Authorization": f"Bearer {token}",
+        },
+    )
+
+    assert response.status_code == 401
+    assert response.json()["detail"] == "Invalid token"
