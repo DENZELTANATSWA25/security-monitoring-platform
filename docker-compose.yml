@@ -30,7 +30,7 @@ services:
   backend:
     build:
       context: ./apps/backend
-    container_name: security_backend
+      target: development
 
     env_file:
       - ./apps/backend/.env
