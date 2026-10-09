@@ -71,7 +71,20 @@ jobs:
           python -m pip install --upgrade pip
           pip install -r requirements-dev.txt
 
+      - name: Create migration validation database
+        working-directory: .
+        env:
+          PGPASSWORD: admin
+        run: |
+          psql \
+            -h localhost \
+            -U admin \
+            -d postgres \
+            -c "CREATE DATABASE security_migration_db;"
+
       - name: Validate migrations
+        env:
+          DATABASE_URL: postgresql+asyncpg://admin:admin@localhost:5432/security_migration_db
         run: |
           alembic upgrade head
           alembic check
