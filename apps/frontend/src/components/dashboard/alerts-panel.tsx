@@ -1,10 +1,13 @@
 "use client";
 
 import { useState } from "react";
-import { useQueryClient } from "@tanstack/react-query";
 
-import { useAlerts } from "@/hooks/use-alerts";
-import { resolveAlert } from "@/services/alerts.service";
+import {
+    useAlerts,
+    useResolveAlert,
+} from "@/hooks/use-alerts";
+import { useCurrentUser } from "@/hooks/use-users";
+import { canResolveAlerts } from "@/lib/permissions";
 
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -13,12 +16,17 @@ export default function AlertsPanel() {
     const {
         data,
         isLoading,
-        error,
+        isError,
     } = useAlerts();
 
-    const queryClient = useQueryClient();
+    const {
+        data: currentUser,
+    } = useCurrentUser();
 
-    const [resolvingId, setResolvingId] = useState<number | null>(null);
+    const resolveAlertMutation = useResolveAlert();
+
+    const [mutationError, setMutationError] =
+        useState<string | null>(null);
 
     if (isLoading) {
         return (
@@ -28,7 +36,7 @@ export default function AlertsPanel() {
         );
     }
 
-    if (error) {
+    if (isError) {
         return (
             <div className="mt-10">
                 <p className="text-red-600">
@@ -42,29 +50,20 @@ export default function AlertsPanel() {
         data?.filter((alert) => !alert.resolved) ?? [];
 
     async function handleResolve(id: number) {
+        setMutationError(null);
+
         try {
-            setResolvingId(id);
-
-            await resolveAlert(id);
-
-            await queryClient.invalidateQueries({
-                queryKey: ["alerts"],
-            });
-
-            await queryClient.invalidateQueries({
-                queryKey: ["dashboard-summary"],
-            });
-
-        } finally {
-            setResolvingId(null);
+            await resolveAlertMutation.mutateAsync(id);
+        } catch {
+            setMutationError(
+                "Failed to resolve the alert. Please try again."
+            );
         }
     }
 
     return (
         <div className="mt-10">
-
-            <div className="flex items-center justify-between mb-4">
-
+            <div className="mb-4 flex items-center justify-between">
                 <h2 className="text-xl font-bold">
                     Active Security Alerts
                 </h2>
@@ -72,84 +71,80 @@ export default function AlertsPanel() {
                 <Badge>
                     {activeAlerts.length}
                 </Badge>
-
             </div>
 
+            {mutationError && (
+                <p className="mb-4 text-sm text-red-600">
+                    {mutationError}
+                </p>
+            )}
+
             {activeAlerts.length === 0 ? (
-
-                <div className="border rounded-xl p-6">
-
+                <div className="rounded-xl border p-6">
                     <p className="font-semibold">
                         No active alerts
                     </p>
 
-                    <p className="text-sm text-muted-foreground mt-1">
+                    <p className="mt-1 text-sm text-muted-foreground">
                         There are currently no unresolved security alerts.
                     </p>
-
                 </div>
-
             ) : (
-
                 <div className="space-y-4">
+                    {activeAlerts.map((alert) => {
+                        const isResolving =
+                            resolveAlertMutation.isPending &&
+                            resolveAlertMutation.variables === alert.id;
 
-                    {activeAlerts.map((alert) => (
+                        return (
+                            <div
+                                key={alert.id}
+                                className="rounded-xl border p-5"
+                            >
+                                <div className="flex items-start justify-between gap-4">
+                                    <div>
+                                        <h3 className="font-bold">
+                                            {alert.alert_type}
+                                        </h3>
 
-                        <div
-                            key={alert.id}
-                            className="border rounded-xl p-5"
-                        >
+                                        <p className="mt-2">
+                                            {alert.message}
+                                        </p>
+                                    </div>
 
-                            <div className="flex items-start justify-between gap-4">
-
-                                <div>
-
-                                    <h3 className="font-bold">
-                                        {alert.alert_type}
-                                    </h3>
-
-                                    <p className="mt-2">
-                                        {alert.message}
-                                    </p>
-
+                                    <Badge>
+                                        {alert.severity}
+                                    </Badge>
                                 </div>
 
-                                <Badge>
-                                    {alert.severity}
-                                </Badge>
+                                <div className="mt-4 flex items-center justify-between">
+                                    <p className="text-sm text-muted-foreground">
+                                        {new Date(
+                                            alert.created_at
+                                        ).toLocaleString()}
+                                    </p>
 
+                                    {canResolveAlerts(
+                                        currentUser?.role
+                                    ) && (
+                                        <Button
+                                            variant="outline"
+                                            disabled={isResolving}
+                                            onClick={() =>
+                                                handleResolve(alert.id)
+                                            }
+                                        >
+                                            {isResolving
+                                                ? "Resolving..."
+                                                : "Resolve"}
+                                        </Button>
+                                    )}
+                                </div>
                             </div>
-
-                            <div className="flex items-center justify-between mt-4">
-
-                                <p className="text-sm text-muted-foreground">
-                                    {new Date(
-                                        alert.created_at
-                                    ).toLocaleString()}
-                                </p>
-
-                                <Button
-                                    variant="outline"
-                                    disabled={resolvingId === alert.id}
-                                    onClick={() =>
-                                        handleResolve(alert.id)
-                                    }
-                                >
-                                    {resolvingId === alert.id
-                                        ? "Resolving..."
-                                        : "Resolve"}
-                                </Button>
-
-                            </div>
-
-                        </div>
-
-                    ))}
-
+                        );
+                    })}
                 </div>
-
             )}
-
         </div>
     );
 }

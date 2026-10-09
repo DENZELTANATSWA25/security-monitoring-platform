@@ -1,14 +1,14 @@
 "use client";
 
 import {
-    useQuery,
     useMutation,
-    useQueryClient
+    useQuery,
+    useQueryClient,
 } from "@tanstack/react-query";
 
 import {
     getAlerts,
-    resolveAlert
+    resolveAlert,
 } from "@/services/alerts.service";
 
 export function useAlerts() {
@@ -16,18 +16,24 @@ export function useAlerts() {
         queryKey: ["alerts"],
         queryFn: getAlerts,
         refetchInterval: 5000,
-        refetchOnWindowFocus: true
+        refetchOnWindowFocus: true,
     });
 }
 
 export function useResolveAlert() {
-    const client = useQueryClient();
+    const queryClient = useQueryClient();
+
     return useMutation({
         mutationFn: resolveAlert,
-        onSuccess: () => {
-            client.invalidateQueries({
-                queryKey: ["alerts"]
-            });
-        }
+        onSuccess: async () => {
+            await Promise.all([
+                queryClient.invalidateQueries({
+                    queryKey: ["alerts"],
+                }),
+                queryClient.invalidateQueries({
+                    queryKey: ["dashboard-summary"],
+                }),
+            ]);
+        },
     });
 }

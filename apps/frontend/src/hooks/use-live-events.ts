@@ -47,7 +47,7 @@ export function useLiveEvents() {
 
                     if (data.type === "security_event") {
                         queryClient.invalidateQueries({
-                            queryKey: ["events"],
+                            queryKey: ["security-events"],
                         });
 
                         queryClient.invalidateQueries({
