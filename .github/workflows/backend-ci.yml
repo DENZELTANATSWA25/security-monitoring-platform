@@ -90,8 +90,15 @@ jobs:
           alembic check
 
       - name: Prepare test database
+        env:
+          PGPASSWORD: admin
         run: |
           alembic upgrade head
+          psql \
+            -h localhost \
+            -U admin \
+            -d security_test_db \
+            -c "TRUNCATE TABLE detection_rule_configs RESTART IDENTITY CASCADE;"
 
       - name: Run backend test suite
         run: |
