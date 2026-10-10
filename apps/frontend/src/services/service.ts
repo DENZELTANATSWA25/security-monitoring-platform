@@ -10,7 +10,7 @@ export function useEvents(){
             "security-events"
         ],
 
-        queryFn:getEvents
+        queryFn: () => getEvents()
 
     });
 

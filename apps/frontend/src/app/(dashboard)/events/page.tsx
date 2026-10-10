@@ -1,21 +1,20 @@
 "use client";
 
-import EventTable from "@/components/dashboard/event-table";
+import SecurityEventsTable from "@/components/events/security-events-table";
 
 export default function EventsPage() {
-    return (
-        <div className="space-y-6">
+  return (
+    <div className="space-y-6">
+      <div>
+        <h1>Security Events</h1>
 
-            <div>
-                <h1>
-                    Security Events
-                </h1>
+        <p className="mt-1 text-muted-foreground">
+          Search, filter, and investigate security events
+          recorded by the monitoring platform.
+        </p>
+      </div>
 
-                <p className="text-muted-foreground mt-1">
-                    Search, inspect, and investigate security events in your system.
-                </p>
-            </div>
-            <EventTable />
-        </div>
-    );
+      <SecurityEventsTable />
+    </div>
+  );
 }

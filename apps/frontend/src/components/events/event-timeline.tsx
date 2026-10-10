@@ -39,8 +39,8 @@ export default function EventTimeline(){
 
 
 const {
-data,
-isLoading
+    data,
+    isLoading,
 }=useEvents();
 
 
