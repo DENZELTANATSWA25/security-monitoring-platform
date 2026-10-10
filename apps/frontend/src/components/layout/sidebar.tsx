@@ -4,7 +4,10 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 
 import { useCurrentUser } from "@/hooks/use-users";
-import { canViewUsers } from "@/lib/permissions";
+import {
+    canViewUsers,
+    canManageRules,
+} from "@/lib/permissions";
 
 
 export default function Sidebar() {
@@ -80,6 +83,15 @@ export default function Sidebar() {
                 >
                     Events
                 </Link>
+
+                {canManageRules(currentUser?.role) && (
+                    <Link
+                        href="/detection-rules"
+                        className={navigationClassName("/detection-rules")}
+                    >
+                        Detection Rules
+                    </Link>
+                )}
 
                 {canViewUsers(currentUser?.role) && (
                     <Link
