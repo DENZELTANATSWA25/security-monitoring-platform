@@ -44,17 +44,19 @@ export function useAssignableUsers() {
 }
 
 export function useCurrentUser() {
-    const token = useSyncExternalStore(
+    const isAuthenticated = useSyncExternalStore(
         subscribeToAuth,
         getAuthSnapshot,
         getServerAuthSnapshot
     );
 
     return useQuery({
-        queryKey: ["current-user"],
+        queryKey: ["current-user", isAuthenticated],
         queryFn: getCurrentUser,
-        enabled: Boolean(token),
+        enabled: isAuthenticated,
         retry: false,
+        staleTime: 0,
+        refetchOnMount: "always",
     });
 }
 

@@ -22,13 +22,11 @@ export default function Navbar() {
 
 
     function handleLogout() {
-
         logout();
 
         queryClient.clear();
 
-        router.push("/login");
-
+        router.replace("/login");
     }
 
 
