@@ -41,7 +41,7 @@ export default function SecurityEventsTable() {
         useState<SecurityEvent | null>(null);
 
     const [dialogOpen, setDialogOpen] = useState(false);
-    
+
     const hasInvalidDateRange =
         Boolean(startDate && endDate) &&
         new Date(startDate).getTime() > new Date(endDate).getTime();
