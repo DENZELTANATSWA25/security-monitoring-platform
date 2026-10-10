@@ -7,7 +7,9 @@ import { useCurrentUser } from "@/hooks/use-users";
 import {
     canViewUsers,
     canManageRules,
+    canViewTelemetryHealth,
 } from "@/lib/permissions";
+
 
 
 export default function Sidebar() {
@@ -90,6 +92,15 @@ export default function Sidebar() {
                         className={navigationClassName("/detection-rules")}
                     >
                         Detection Rules
+                    </Link>
+                )}
+
+                {canViewTelemetryHealth(currentUser?.role) && (
+                    <Link
+                        href="/telemetry-sources"
+                        className={navigationClassName("/telemetry-sources")}
+                    >
+                        Telemetry Sources
                     </Link>
                 )}
 

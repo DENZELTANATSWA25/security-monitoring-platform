@@ -23,3 +23,15 @@ export function canManageRules(
 ) {
     return role === "admin";
 }
+
+export function canViewTelemetryHealth(
+    role: UserRole | undefined
+) {
+    return role === "admin" || role === "analyst";
+}
+
+export function canManageTelemetrySources(
+    role: UserRole | undefined
+) {
+    return role === "admin";
+}
