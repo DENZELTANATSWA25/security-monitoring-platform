@@ -7,6 +7,7 @@ import {
 
 import {
     getEvents,
+    getEventById,
     type EventQueryParams,
 } from "@/services/events.service";
 
@@ -27,5 +28,18 @@ export function useEvents(
         refetchInterval: 5000,
         refetchOnWindowFocus: true,
         ...options,
+    });
+}
+
+export function useEvent(
+    eventId: number
+) {
+    return useQuery({
+        queryKey: ["security-event", eventId],
+        queryFn: () => getEventById(eventId),
+        enabled:
+            Number.isInteger(eventId) &&
+            eventId > 0,
+        staleTime: 30_000,
     });
 }

@@ -4,13 +4,18 @@ import { useQuery } from "@tanstack/react-query";
 
 import {
     getIncidents,
-    getIncident
+    getIncident,
+    type IncidentQueryParams,
 } from "@/services/incident.service";
 
-export function useIncidents() {
+export function useIncidents(
+    params: IncidentQueryParams = {}
+) {
     return useQuery({
-        queryKey: ["incidents"],
-        queryFn: getIncidents,
+        queryKey: ["incidents", params],
+        queryFn: () => getIncidents(params),
+        refetchInterval: 5000,
+        refetchOnWindowFocus: true,
     });
 }
 
@@ -20,6 +25,6 @@ export function useIncident(
     return useQuery({
         queryKey: ["incident", id],
         queryFn: () => getIncident(id),
-        enabled: !!id
+        enabled: Number.isInteger(id) && id > 0,
     });
 }

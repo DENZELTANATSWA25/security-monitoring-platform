@@ -6,9 +6,25 @@ import {
     IncidentStatus,
 } from '@/types/incident';
 
-export async function getIncidents() {
+export interface IncidentQueryParams {
+    limit?: number;
+    offset?: number;
+    status?: IncidentStatus;
+    severity?: string;
+    assigned_user_id?: number;
+    unassigned?: boolean;
+    start_date?: string;
+    end_date?: string;
+    search?: string;
+    sort_order?: "asc" | "desc";
+}
+
+export async function getIncidents(
+    params: IncidentQueryParams = {}
+): Promise<Incident[]> {
     const response = await api.get<Incident[]>(
-        "/incidents"
+        "/incidents/",
+        { params }
     );
 
     return response.data;

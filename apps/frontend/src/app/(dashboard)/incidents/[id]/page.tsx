@@ -12,7 +12,7 @@ import {
   useAssignableUsers,
   useCurrentUser,
 } from "@/hooks/use-users";
-import { useEvents } from "@/hooks/use-events";
+import { useEvent } from "@/hooks/use-events";
 
 import {
   assignIncident,
@@ -80,9 +80,9 @@ export default function IncidentDetailsPage() {
   } = useIncidentResolution(id);
 
   const {
-    data: securityEvents = [],
+    data: originatingEvent,
     isLoading: isLoadingSecurityEvents,
-  } = useEvents();
+  } = useEvent(incident?.event_id ?? 0);
 
   const {
     data: assignableUsers = [],
@@ -138,11 +138,6 @@ export default function IncidentDetailsPage() {
 
 
   const currentIncident = incident;
-
-  const originatingEvent = securityEvents.find(
-    (event) =>
-      event.id === currentIncident.event_id,
-  );
 
 
   /**
@@ -375,7 +370,7 @@ export default function IncidentDetailsPage() {
       <div>
         <OriginatingEvent
           eventId={currentIncident.event_id}
-          event={originatingEvent}
+          event={originatingEvent ?? undefined}
           isLoading={isLoadingSecurityEvents}
         />
 
