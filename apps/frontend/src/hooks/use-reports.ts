@@ -8,7 +8,8 @@ export function useSecurityReport() {
     return useQuery({
         queryKey: ["security-report"],
         queryFn: getSecurityReport,
-        refetchInterval: 10000,
-        refetchOnWindowFocus: true
+        refetchInterval: 30000,
+        refetchOnWindowFocus: true,
+        retry: 1,
     });
 }
