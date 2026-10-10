@@ -8,6 +8,7 @@ import {
     canViewUsers,
     canManageRules,
     canViewTelemetryHealth,
+    canViewAuditLogs,
 } from "@/lib/permissions";
 
 
@@ -110,6 +111,15 @@ export default function Sidebar() {
                         className={navigationClassName("/users")}
                     >
                         Users
+                    </Link>
+                )}
+
+                {canViewAuditLogs(currentUser?.role) && (
+                    <Link
+                        href="/audit-logs"
+                        className={navigationClassName("/audit-logs")}
+                    >
+                        Audit Logs
                     </Link>
                 )}
 

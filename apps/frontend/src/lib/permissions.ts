@@ -35,3 +35,9 @@ export function canManageTelemetrySources(
 ) {
     return role === "admin";
 }
+
+export function canViewAuditLogs(
+    role: UserRole | undefined
+) {
+    return role === "admin";
+}
