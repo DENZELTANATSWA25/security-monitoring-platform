@@ -27,10 +27,12 @@ import {
     getServerAuthSnapshot,
 } from "@/lib/auth";
 
-export function useUsers() {
+export function useUsers(enabled = true) {
     return useQuery({
         queryKey: ["users"],
         queryFn: getUsers,
+        enabled,
+        retry: false,
     });
 }
 
