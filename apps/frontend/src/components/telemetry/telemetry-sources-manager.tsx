@@ -1,7 +1,7 @@
 "use client";
 
 import axios from "axios";
-import { useEffect, useState } from "react";
+import { useState } from "react";
 
 import { useCurrentUser } from "@/hooks/use-users";
 import {
@@ -163,11 +163,6 @@ export default function TelemetrySourcesManager() {
 
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
-
-  // Clear the displayed credential when this component unmounts.
-  useEffect(() => {
-    return () => setCredential(null);
-  }, []);
 
   async function registerSource() {
     const trimmedName = name.trim();
