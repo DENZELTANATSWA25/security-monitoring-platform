@@ -87,12 +87,9 @@ export default function IncidentsPage() {
     queryParams.severity = filters.severity;
   }
 
-  if (
-    filters.assignment === "unassigned" &&
-    !invalidAssignment
-    ) {
-        queryParams.assigned_user_id = assignmentId;
-    }
+  if (filters.assignment === "unassigned") {
+    queryParams.unassigned = true;
+  }
 
   if (filters.assignment === "assigned") {
     const userId = Number(assignedUserId);
