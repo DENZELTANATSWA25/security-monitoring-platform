@@ -35,7 +35,7 @@ export default function AlertTable() {
     const [searchInput, setSearchInput] = useState("");
     const [search, setSearch] = useState("");
 
-    const [status, setStatus] = useState("open");
+    const [status, setStatus] = useState("all");
     const [severity, setSeverity] = useState("");
     const [alertType, setAlertType] = useState("");
 
@@ -106,7 +106,7 @@ export default function AlertTable() {
     function resetFilters() {
         setSearchInput("");
         setSearch("");
-        setStatus("open");
+        setStatus("all");
         setSeverity("");
         setAlertType("");
         setStartDate("");
@@ -174,9 +174,9 @@ export default function AlertTable() {
                         }}
                         className="h-9 rounded-md border bg-background px-3 text-sm"
                     >
+                        <option value="all">All</option>
                         <option value="open">Open</option>
                         <option value="resolved">Resolved</option>
-                        <option value="all">All</option>
                     </select>
                 </div>
 

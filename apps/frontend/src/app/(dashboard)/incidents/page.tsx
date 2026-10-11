@@ -400,7 +400,7 @@ export default function IncidentsPage() {
               key={incident.id}
               href={`/incidents/${incident.id}`}
             >
-              <Card className="transition hover:bg-slate-50">
+              <Card className="transition-colors duration-200 hover:bg-accent/40 hover:border-primary/30">
                 <CardHeader>
                   <div className="flex flex-wrap items-center justify-between gap-3">
                     <CardTitle>

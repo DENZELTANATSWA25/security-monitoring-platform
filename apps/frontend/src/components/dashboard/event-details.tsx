@@ -117,17 +117,15 @@ Object.entries(event.event_metadata).map(([key,value])=>(
 
 <div
 key={key}
-className="flex justify-between border-b pb-2"
+className="flex min-w-0 flex-col gap-1 border-b border-border pb-3 sm:flex-row sm:items-start sm:justify-between sm:gap-4"
 >
+    <span className="shrink-0 text-sm font-semibold capitalize text-foreground">
+        {key.replaceAll("_"," ")}
+    </span>
 
-<span className="font-semibold capitalize">
-{key.replaceAll("_"," ")}
-</span>
-
-<span className="text-slate-600 break-all">
-{String(value)}
-</span>
-
+    <span className="min-w-0 break-all text-sm text-muted-foreground sm:text-right">
+        {String(value)}
+    </span>
 </div>
 
 ))}

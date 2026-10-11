@@ -103,7 +103,7 @@ export default function SecurityEventsTable() {
 
     return (
         <div className="space-y-6">
-            <div className="flex flex-wrap items-end gap-3 rounded-x1 border bg-card p-4">
+            <div className="flex flex-wrap items-end gap-3 rounded-xl border bg-card p-4">
                 <form
                     className="flex flex-wrap items-center gap-2"
                     onSubmit={(event) => {
@@ -221,7 +221,7 @@ export default function SecurityEventsTable() {
                             setSeverity(event.target.value);
                             setPage(0);
                         }}
-                        className="h-9 rounded-md border bg-white px-3 text-sm"
+                        className="h-9 rounded-md border border-input bg-background px-3 text-sm text-foreground shadow-xs outline-none focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50"
                     >
                         <option value="">All severities</option>
                         <option value="INFO">Info</option>
@@ -248,7 +248,7 @@ export default function SecurityEventsTable() {
                             );
                             setPage(0);
                         }}
-                        className="h-9 rounded-md border bg-white px-3 text-sm"
+                        className="h-9 rounded-md border border-input bg-background px-3 text-sm text-foreground shadow-xs outline-none focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50"
                     >
                         <option value="desc">Newest first</option>
                         <option value="asc">Oldest first</option>
