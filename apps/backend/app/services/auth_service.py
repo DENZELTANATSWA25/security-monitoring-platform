@@ -1,5 +1,7 @@
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from datetime import datetime, timezone
+
 from app.core.security import (
     verify_password,
     create_access_token,
@@ -84,6 +86,10 @@ async def login_user(
         user_id=user.id,
         details=f"{user.email} logged in",
     )
+
+    # Record the latest successful authentication time.
+    # The existing database column stores timezone-naive UTC values
+    user.last_login = datetime.now(timezone.utc).replace(tzinfo=None)
 
     await db.commit()
 

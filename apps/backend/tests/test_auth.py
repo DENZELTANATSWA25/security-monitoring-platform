@@ -5,6 +5,7 @@ from httpx import AsyncClient
 from app.models.user import User
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
+from datetime import datetime, timezone
 
 from app.core.config import settings
 from app.models.login_attempt import LoginAttempt
@@ -30,6 +31,124 @@ async def test_valid_login_returns_access_token(
 
     assert body["access_token"]
     assert body["token_type"] == "bearer"
+
+async def test_successful_login_updates_last_login(
+    client: AsyncClient,
+    viewer_user: User,
+    db_session: AsyncSession,
+) -> None:
+    """Successful authentication should persist the last login time."""
+
+    # Capture the ID before expiring ORM objects.
+    user_id = viewer_user.id
+
+    before_login = datetime.now(timezone.utc).replace(tzinfo=None)
+
+    response = await client.post(
+        "/api/v1/auth/login",
+        json={
+            "email": viewer_user.email,
+            "password": "TestPassword123!",
+        },
+    )
+
+    assert response.status_code == 200
+
+    # Expire cached ORM state so the next query reads the database.
+    db_session.expire_all()
+
+    result = await db_session.execute(
+        select(User).where(User.id == user_id)
+    )
+
+    updated_user = result.scalar_one()
+
+    assert updated_user.last_login is not None
+    assert updated_user.last_login >= before_login
+
+    after_login = datetime.now(timezone.utc).replace(tzinfo=None)
+
+    assert updated_user.last_login <= after_login
+
+async def test_failed_login_does_not_update_last_login(
+    client: AsyncClient,
+    viewer_user: User,
+    db_session: AsyncSession,
+) -> None:
+    """Invalid credentials must not change the last login timestamp."""
+
+    user_id = viewer_user.id
+
+    # Establish the initial timestamp.
+    initial_result = await db_session.execute(
+        select(User.last_login).where(User.id == user_id)
+    )
+    initial_last_login = initial_result.scalar_one()
+
+    response = await client.post(
+        "/api/v1/auth/login",
+        json={
+            "email": viewer_user.email,
+            "password": "DefinitelyWrongPassword!",
+        },
+    )
+
+    assert response.status_code == 401
+
+    # Reload the value directly from the database.
+    result = await db_session.execute(
+        select(User.last_login).where(User.id == user_id)
+    )
+
+    assert result.scalar_one() == initial_last_login
+
+async def test_repeated_login_updates_last_login(
+    client: AsyncClient,
+    viewer_user: User,
+    db_session: AsyncSession,
+) -> None:
+    """Each successful login should update the last login timestamp."""
+
+    user_id = viewer_user.id
+    email = viewer_user.email
+
+    credentials = {
+        "email": email,
+        "password": "TestPassword123!",
+    }
+
+    # First successful login.
+    first_response = await client.post(
+        "/api/v1/auth/login",
+        json=credentials,
+    )
+
+    assert first_response.status_code == 200
+
+    first_result = await db_session.execute(
+        select(User.last_login).where(User.id == user_id)
+    )
+
+    first_login = first_result.scalar_one()
+
+    assert first_login is not None
+
+    # Second successful login.
+    second_response = await client.post(
+        "/api/v1/auth/login",
+        json=credentials,
+    )
+
+    assert second_response.status_code == 200
+
+    second_result = await db_session.execute(
+        select(User.last_login).where(User.id == user_id)
+    )
+
+    second_login = second_result.scalar_one()
+
+    assert second_login is not None
+    assert second_login > first_login
 
 async def test_login_persists_resolved_location(
     client: AsyncClient,
