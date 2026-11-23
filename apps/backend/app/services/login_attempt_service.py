@@ -1,10 +1,24 @@
-from sqlalchemy.ext.asyncio import AsyncSession
+"""Persistence and detection for authentication attempts."""
+
+import logging
 from datetime import datetime, timedelta
 
-from sqlalchemy import select, func
+from sqlalchemy import func, select
+from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.core.config import settings
 from app.models.login_attempt import LoginAttempt
+from app.services.behavioural_detection.inference import (
+    detect_behavioural_anomaly,
+)
+from app.services.behavioural_detection.login_adapter import (
+    BehaviouralFeatureError,
+    extract_login_behaviour,
+)
 from app.services.detection.base import DetectionContext
+
+
+logger = logging.getLogger(__name__)
 
 async def record_login_attempt(
     db: AsyncSession,
@@ -55,6 +69,42 @@ async def record_login_attempt(
                 severity=detection.severity,
                 message=detection.message,
             )
+
+        # Optional RF v3 shadow inference; never generates alerts.
+        if settings.BEHAVIOURAL_RF_SHADOW_ENABLED:
+            try:
+                features = await extract_login_behaviour(
+                    db,
+                    attempt,
+                )
+
+            except BehaviouralFeatureError:
+                # Invalid ML input must not interrupt authentication.
+                logger.warning(
+                    "Behavioural RF shadow features unavailable: "
+                    "attempt_id=%s",
+                    attempt.id,
+                )
+
+            else:
+                result = detect_behavioural_anomaly(features)
+
+                if result.available:
+                    logger.info(
+                        "Behavioural RF shadow prediction: "
+                        "attempt_id=%s anomaly=%s score=%.6f model=%s",
+                        attempt.id,
+                        result.is_anomaly,
+                        result.score,
+                        result.model_version,
+                    )
+                else:
+                    logger.warning(
+                        "Behavioural RF shadow prediction unavailable: "
+                        "attempt_id=%s reason=%s",
+                        attempt.id,
+                        result.reason,
+                    )
 
         await db.commit()
 

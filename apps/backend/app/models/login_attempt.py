@@ -5,6 +5,7 @@ from sqlalchemy import (
     Column,
     DateTime,
     Float,
+    Index,
     Integer,
     String,
 )
@@ -13,6 +14,15 @@ from app.db.base import Base
 
 class LoginAttempt(Base):
     __tablename__ = "login_attempts"
+
+    # Supports the 24-hour behavioural history query and ordering.
+    __table_args__ = (
+        Index(
+            "ix_login_attempts_timestamp_id",
+            "timestamp",
+            "id",
+        ),
+    )
 
     id = Column(
         Integer,

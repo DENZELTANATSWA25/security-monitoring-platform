@@ -42,6 +42,10 @@ class Settings(BaseSettings):
     # ML anomaly-detection model artifacts.
     ANOMALY_MODEL_DIRECTORY: str = "models/anomaly_detection"
 
+    # Optional RF v3 behavioural inference.
+    # Disabled until live-data validation is complete.
+    BEHAVIOURAL_RF_SHADOW_ENABLED: bool = False
+
     model_config = SettingsConfigDict(
         env_file=".env",
         extra="ignore",

@@ -38,3 +38,7 @@ node_modules/
 .next/
 out/
 dist/
+
+# Frozen behavioural RF model: distributed separately after verification.
+# Never commit serialized model artifacts or local evaluation data.
+/apps/backend/models/behavioural_rf_v3/*.joblib
