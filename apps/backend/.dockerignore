@@ -17,3 +17,9 @@ venv/
 models/anomaly_detection/
 
 tests/
+
+# Frozen behavioural RF artifacts are provisioned separately.
+models/behavioural_rf_v3/*.joblib
+
+# Local research artifacts must not enter Docker images.
+evaluation/

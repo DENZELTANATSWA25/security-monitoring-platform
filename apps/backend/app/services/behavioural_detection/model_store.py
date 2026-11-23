@@ -21,8 +21,15 @@ MODEL_NAME = "behavioural_random_forest_v3"
 MODEL_THRESHOLD = 0.6244841045172164
 MODEL_RANDOM_STATE = 42
 
-DEFAULT_MODEL_PATH = Path(
-    "models/behavioural_rf_v3/model.joblib"
+# Resolve the model relative to the backend root, not the process CWD.
+# model_store.py -> behavioural_detection -> services -> app -> backend
+BACKEND_ROOT = Path(__file__).resolve().parents[3]
+
+DEFAULT_MODEL_PATH = (
+    BACKEND_ROOT
+    / "models"
+    / "behavioural_rf_v3"
+    / "model.joblib"
 )
 
 
