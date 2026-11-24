@@ -89,8 +89,15 @@ def predict_behavioural_anomaly(
 def get_cached_behavioural_model(
     path: Path,
 ) -> StoredBehaviouralModel:
-    """Load the verified model once per application process."""
-    return load_behavioural_model(path)
+    """Load the verified model for single-threaded shadow inference."""
+
+    stored_model = load_behavioural_model(path)
+
+    # Optimize single-event inference without modifying the artifact.
+    # Configuration is applied once before the model is cached.
+    stored_model.model.set_params(n_jobs=1)
+
+    return stored_model
 
 def detect_behavioural_anomaly(
     features: BehaviourVectorV2,
