@@ -40,8 +40,8 @@ async def test_real_rf_model_runs_in_shadow_mode(
         return result
 
     with patch(
-        "app.services.login_attempt_service."
-        "detect_behavioural_anomaly",
+        "app.services.behavioural_detection."
+        "async_inference.detect_behavioural_anomaly",
         side_effect=capture_prediction,
     ) as prediction:
         attempt = await record_login_attempt(

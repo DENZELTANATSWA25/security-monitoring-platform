@@ -8,12 +8,12 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.config import settings
 from app.models.login_attempt import LoginAttempt
-from app.services.behavioural_detection.inference import (
-    detect_behavioural_anomaly,
-)
 from app.services.behavioural_detection.login_adapter import (
     BehaviouralFeatureError,
     extract_login_behaviour,
+)
+from app.services.behavioural_detection.async_inference import (
+    run_behavioural_inference,
 )
 from app.services.detection.base import DetectionContext
 
@@ -87,7 +87,10 @@ async def record_login_attempt(
                 )
 
             else:
-                result = detect_behavioural_anomaly(features)
+                result = await run_behavioural_inference(
+                    features,
+                    strategy="direct",
+                )
 
                 if result.available:
                     logger.info(

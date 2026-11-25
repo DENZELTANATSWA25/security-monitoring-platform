@@ -61,7 +61,7 @@ async def test_successful_http_login_shadow_disabled(
     monkeypatch.setattr(settings, "BEHAVIOURAL_RF_SHADOW_ENABLED", False)
 
     with patch(
-        "app.services.login_attempt_service.detect_behavioural_anomaly",
+        "app.services.behavioural_detection.async_inference.detect_behavioural_anomaly",
     ) as prediction:
         response = await client.post(
             LOGIN_URL,
@@ -91,7 +91,7 @@ async def test_successful_http_login_runs_real_rf(
         return result
 
     with patch(
-        "app.services.login_attempt_service.detect_behavioural_anomaly",
+        "app.services.behavioural_detection.async_inference.detect_behavioural_anomaly",
         side_effect=capture_prediction,
     ) as prediction:
         response = await client.post(
@@ -124,7 +124,7 @@ async def test_failed_http_login_runs_shadow_without_authentication(
     monkeypatch.setattr(settings, "BEHAVIOURAL_RF_SHADOW_ENABLED", True)
 
     with patch(
-        "app.services.login_attempt_service.detect_behavioural_anomaly",
+        "app.services.behavioural_detection.async_inference.detect_behavioural_anomaly",
         wraps=detect_behavioural_anomaly,
     ) as prediction:
         response = await client.post(
@@ -154,7 +154,7 @@ async def test_repeated_http_logins_use_prior_history(
         return detect_behavioural_anomaly(features)
 
     with patch(
-        "app.services.login_attempt_service.detect_behavioural_anomaly",
+        "app.services.behavioural_detection.async_inference.detect_behavioural_anomaly",
         side_effect=capture_prediction,
     ):
         for password in [
@@ -212,7 +212,7 @@ async def test_unavailable_rf_does_not_interrupt_http_login(
     )
 
     with patch(
-        "app.services.login_attempt_service.detect_behavioural_anomaly",
+        "app.services.behavioural_detection.async_inference.detect_behavioural_anomaly",
         return_value=unavailable,
     ) as prediction:
         response = await client.post(
@@ -249,7 +249,7 @@ async def test_missing_model_preserves_http_authentication(
         return result
 
     with patch(
-        "app.services.login_attempt_service.detect_behavioural_anomaly",
+        "app.services.behavioural_detection.async_inference.detect_behavioural_anomaly",
         side_effect=predict_with_missing_model,
     ) as prediction:
         response = await client.post(
@@ -293,7 +293,7 @@ async def test_corrupted_model_preserves_http_authentication(
         return result
 
     with patch(
-        "app.services.login_attempt_service.detect_behavioural_anomaly",
+        "app.services.behavioural_detection.async_inference.detect_behavioural_anomaly",
         side_effect=predict_with_corrupted_model,
     ):
         response = await client.post(
@@ -331,7 +331,7 @@ async def test_invalid_behavioural_features_do_not_block_login(
             side_effect=BehaviouralFeatureError("Invalid synthetic data"),
         ) as extraction,
         patch(
-            "app.services.login_attempt_service.detect_behavioural_anomaly",
+            "app.services.behavioural_detection.async_inference.detect_behavioural_anomaly",
         ) as prediction,
     ):
         response = await client.post(
