@@ -1,0 +1,101 @@
+{
+  "experiment": "phase_6_security_reliability_incident_evaluation",
+  "generated_at_utc": "2026-11-25T22:45:26.509361+00:00",
+  "git_commit": "dee1e19c9d22d70b7a008cba3d314c4785728f0f",
+  "test_environment": {
+    "database": "security_test_db",
+    "behavioural_rf_shadow_enabled": false,
+    "execution": "Docker Compose backend container"
+  },
+  "verified_regression": {
+    "passed": 519,
+    "failed": 0,
+    "duration_seconds": 232.47,
+    "source": "User-provided pytest terminal output",
+    "note": "Historical observed result, not re-executed by this script"
+  },
+  "phase_6": {
+    "test_count": 26,
+    "test_files": [
+      {
+        "phase": "6A",
+        "evaluation": "Authentication and RBAC",
+        "file": "apps/backend/tests/test_auth_security_evaluation.py",
+        "test_count": 8,
+        "tests": [
+          "test_expired_token_is_rejected",
+          "test_tampered_token_is_rejected",
+          "test_malformed_token_is_rejected",
+          "test_token_signed_with_wrong_secret_is_rejected",
+          "test_deactivated_user_cannot_reuse_token",
+          "test_deleted_user_cannot_reuse_token",
+          "test_downgraded_admin_loses_admin_access",
+          "test_forged_role_claim_does_not_escalate_privileges"
+        ],
+        "sha256": "8b196398130a5bd51a1470bdbb3f3e225493a9e317f9038845a6645a09800738"
+      },
+      {
+        "phase": "6B",
+        "evaluation": "Telemetry ingestion security",
+        "file": "apps/backend/tests/test_ingestion_security_evaluation.py",
+        "test_count": 4,
+        "tests": [
+          "test_rate_limit_boundary_and_retry_after",
+          "test_rate_limited_request_does_not_modify_source",
+          "test_redis_failure_prevents_ingestion",
+          "test_identical_events_are_currently_accepted"
+        ],
+        "sha256": "4a5e68bd76e47eaf76bd91fbcce013cba7afd5784ad90f79fe72b48d217524d0"
+      },
+      {
+        "phase": "6C",
+        "evaluation": "Reliability and failure recovery",
+        "file": "apps/backend/tests/test_reliability_security_evaluation.py",
+        "test_count": 3,
+        "tests": [
+          "test_detection_failure_rolls_back_event",
+          "test_alert_failure_rolls_back_event",
+          "test_websocket_failure_occurs_after_commit"
+        ],
+        "sha256": "c73202f10b1deaefb9139e3184c5dd659712381dd84bc5c9f1212ceaff07b302"
+      },
+      {
+        "phase": "6D",
+        "evaluation": "Incident workflow integrity",
+        "file": "apps/backend/tests/test_incident_workflow_evaluation.py",
+        "test_count": 5,
+        "tests": [
+          "test_note_failure_can_be_rolled_back",
+          "test_evidence_failure_can_be_rolled_back",
+          "test_successful_note_has_exactly_one_activity",
+          "test_duplicate_event_link_does_not_add_activity",
+          "test_duplicate_alert_link_does_not_add_activity"
+        ],
+        "sha256": "d3a5569ee69d8cf9c79c5a08bd4e93da2c808b1f2c36e6a18aab0c632fee717f"
+      },
+      {
+        "phase": "6E",
+        "evaluation": "Auditability and credential confidentiality",
+        "file": "apps/backend/tests/test_audit_security_evaluation.py",
+        "test_count": 6,
+        "tests": [
+          "test_successful_login_records_correct_actor",
+          "test_admin_role_change_has_correct_audit_actor",
+          "test_viewer_role_change_is_rejected_without_audit_entry",
+          "test_failed_login_has_no_success_audit_entry",
+          "test_role_change_audit_failure_rolls_back_update",
+          "test_telemetry_credential_not_exposed_in_audit_log"
+        ],
+        "sha256": "b80c4168ad2716189eee2a026af7be0dcaa1d47a78561a8bb45adabda496fe65"
+      }
+    ]
+  },
+  "limitations": [
+    "Synthetic integration tests do not establish production security.",
+    "Failure injection exercises selected failure paths only.",
+    "Audit logs have not been demonstrated to be tamper-proof.",
+    "Some rollback tests explicitly roll back the shared test session.",
+    "Credential confidentiality was evaluated for selected audit records.",
+    "The full regression result is reported from a previous execution."
+  ]
+}
